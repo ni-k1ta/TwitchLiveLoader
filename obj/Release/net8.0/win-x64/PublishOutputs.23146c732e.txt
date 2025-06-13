@@ -1,0 +1,2 @@
+C:\Users\sosit\Documents\c#\TwitchStreamsRecorder\bin\Release\net8.0\win-x64\publish\TwitchStreamsRecorder.pdb
+C:\Users\sosit\Documents\c#\TwitchStreamsRecorder\bin\Release\net8.0\win-x64\publish\TwitchStreamsRecorder.exe

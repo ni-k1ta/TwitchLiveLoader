@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using Serilog;
+using System.Text.Json;
 using TwitchLib.Api;
 
 namespace TwitchStreamsRecorder
@@ -10,21 +11,33 @@ namespace TwitchStreamsRecorder
         private readonly HttpClient _http;
         public DateTime ExpiresUtc { get; private set; }
 
-        public TokenRefresher(Config cfg, TwitchAPI api, HttpClient http)
-       => (_cfg, _api, _http, ExpiresUtc) = (cfg, api, http, DateTime.UtcNow);
+        private readonly SemaphoreSlim _refreshLock = new(1, 1);
+
+        private readonly ILogger _log;
+
+        public TokenRefresher(Config cfg, TwitchAPI api, HttpClient http, ILogger logger)
+       => (_cfg, _api, _http, ExpiresUtc, _log) = (cfg, api, http, DateTime.UtcNow, logger.ForContext("Source", "TokenRefresher"));
 
         public async Task RefreshAccessTokenAsync(bool persist, Action saveConfig)
         {
+            await _refreshLock.WaitAsync();
+
             try
             {
-                Console.WriteLine("refreshing user token…");
-                var resp = await _http.PostAsync("https://id.twitch.tv/oauth2/token", new FormUrlEncodedContent(new Dictionary<string, string>
+                _log.Information("Обновление user токена...");
+
+                var url = "https://id.twitch.tv/oauth2/token";
+                var values = new[]
                 {
-                    ["client_id"] = _cfg.ClientId,
-                    ["client_secret"] = _cfg.ClientSecret,
-                    ["grant_type"] = "refresh_token",
-                    ["refresh_token"] = _cfg.RefreshToken
-                }));
+                    new KeyValuePair<string,string>("client_id",     _cfg.ClientId),
+                    new KeyValuePair<string,string>("client_secret", _cfg.ClientSecret),
+                    new KeyValuePair<string,string>("grant_type",    "refresh_token"),
+                    new KeyValuePair<string,string>("refresh_token", _cfg.RefreshToken)
+                };
+                var content = new FormUrlEncodedContent(values);
+
+                var resp = await _http.PostAsync(url, content/*, cancellationToken*/);
+
                 resp.EnsureSuccessStatusCode();
 
                 var json = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
@@ -34,35 +47,53 @@ namespace TwitchStreamsRecorder
 
                 _api.Settings.AccessToken = _cfg.UserToken;
 
-                Console.WriteLine("token refreshed -> valid till " + ExpiresUtc.ToLocalTime());
+                _log.Information($"Токен обновлён -> дейтсвителен до {ExpiresUtc.ToLocalTime()}");
 
                 if (persist) saveConfig();
             }
+            catch (HttpRequestException hre)
+            {
+                _log.Warning(hre, "Token refresh HTTP error. Повор через 3м. Ошибка:");
+                ExpiresUtc = DateTime.UtcNow.AddMinutes(3);
+            }
+            catch (JsonException je)
+            {
+                _log.Warning(je, "Token refresh parse error. Повор через 3м. Ошибка:");
+                ExpiresUtc = DateTime.UtcNow.AddMinutes(3);
+            }
             catch (Exception ex)
             {
-                Console.WriteLine("token refresh FAILED: " + ex.Message);
-                ExpiresUtc = DateTime.UtcNow.AddMinutes(1);
+                _log.Warning(ex, "Token refresh FAILED. Повор через 3м. Ошибка:");
+                ExpiresUtc = DateTime.UtcNow.AddMinutes(3);
+            }
+            finally
+            {
+                _refreshLock.Release();
             }
             
         }
 
         public async Task RefreshLoopAsync(Action saveConfig, CancellationToken cts)
         {
-            try
+            _log.Debug("Token refresh loop started.");
+            
+            while (!cts.IsCancellationRequested)
             {
-                while (!cts.IsCancellationRequested)
+                var delay = ExpiresUtc - DateTime.UtcNow - TimeSpan.FromMinutes(2);
+                if (delay < TimeSpan.Zero) delay = TimeSpan.Zero;
+                try
                 {
-                    var delay = ExpiresUtc - DateTime.UtcNow - TimeSpan.FromMinutes(2);
-                    if (delay < TimeSpan.Zero) delay = TimeSpan.Zero;
                     await Task.Delay(delay, cts);
-                    await RefreshAccessTokenAsync(persist: true, saveConfig);
+                    await RefreshAccessTokenAsync(true, saveConfig);
+                }
+                catch (OperationCanceledException) { break; }
+                catch (Exception ex)
+                {
+                    _log.Warning(ex, $"Refresh loop error. Retrying in 1m. Ошибка:");
+                    await Task.Delay(TimeSpan.FromMinutes(1), cts);
                 }
             }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Refresh loop error: {ex}");
-            }
+            _log.Debug("Token refresh loop stopped.");
         }
     }
 }

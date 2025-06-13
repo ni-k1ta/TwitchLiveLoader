@@ -4,29 +4,29 @@
     {
         public static string CreateSessionDirectory(string? pathForSessionDirectory, string twitchChannelLogin)
         {
-            pathForSessionDirectory ??= AppContext.BaseDirectory;
+            var safeLogin = Path.GetInvalidFileNameChars().Aggregate(twitchChannelLogin, (s, c) => s.Replace(c, '_'));
 
-            var sessionDir = Path.Combine(pathForSessionDirectory, twitchChannelLogin + "_" + DateTime.Now.ToString("yyyy-MM-dd"));
-
-            Directory.CreateDirectory(sessionDir);
-
-            return sessionDir;
+            return CreateTimestampedDirectory(pathForSessionDirectory, safeLogin, "yyyy-MM-dd");
         }
-        public static string CreateRecordBufferDirectory(string pathForBufferDirectory)
+        public static string CreateRecordBufferDirectory(string? pathForBufferDirectory) => CreateTimestampedDirectory(pathForBufferDirectory, "buffer", "HH-mm");
+        public static string CreateTranscodeResultDirectory(string? pathForResultDirectory) => CreateTimestampedDirectory(pathForResultDirectory, "result", "HH-mm");
+
+        private static string Timestamp(string? format = "yyyy-MM-dd") => DateTime.Now.ToString(format);
+        private static string CreateTimestampedDirectory(string? basePath, string directoryPrefix, string timestampFormat)
         {
-            var bufferDir = Path.Combine(pathForBufferDirectory, "buffer_" + DateTime.Now.ToString("HH-mm"));
+            basePath ??= AppContext.BaseDirectory;
 
-            Directory.CreateDirectory(bufferDir);
-
-            return bufferDir;
-        }
-        public static string CreateTranscodeResultDirectory(string pathForResultDirectory)
-        {
-            var resultDir = Path.Combine(pathForResultDirectory, "result_" + DateTime.Now.ToString("HH-mm"));
-
-            Directory.CreateDirectory(resultDir);
-
-            return resultDir;
+            var name = $"{directoryPrefix}_{Timestamp(timestampFormat)}";
+            var fullPath = Path.Combine(basePath!, name);
+            try
+            {
+                Directory.CreateDirectory(fullPath);
+                return fullPath;
+            }
+            catch (Exception ex)
+            {
+                throw new IOException($"Не удалось создать директорию {fullPath}: {ex.Message}");
+            }
         }
     }
 }

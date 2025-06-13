@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using Serilog;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 
 namespace TwitchStreamsRecorder
@@ -13,12 +14,20 @@ namespace TwitchStreamsRecorder
 
         public Process? FfmpegProc { get => _ffmpegProc; set => _ffmpegProc = value; }
 
+        private readonly ILogger _log;
+
+        public TranscoderService(ILogger logger) { _log = logger.ForContext("Source", "Transcoder"); }
+
         private string PrepareToTranscoding(string transcodeResultDirectory)
         {
             return Path.Combine(transcodeResultDirectory, $"rec{_outputFileIndex++}_%Y-%m-%d_%H-%M-%S.mp4");
         }
-        public async Task StartTranscoding(string pathForOutputResult, CancellationToken cts)
+        public async Task StartTranscoding(string pathForOutputResult, TelegramChannelService tgChannel, CancellationToken cts)
         {
+            if (_bufferFilesQueue == null)
+                throw new InvalidOperationException("Buffer queue is not set. Call SetBufferQueue() first.");
+
+
             if (FfmpegProc is not null && !FfmpegProc.HasExited)
                 return;
 
@@ -27,14 +36,23 @@ namespace TwitchStreamsRecorder
 
             string resultDir = DirectoriesManager.CreateTranscodeResultDirectory(pathForOutputResult);
 
+            var firstFile = _bufferFilesQueue.Take(cts);
+            currentBufferFile = firstFile;
+
+            int i = 0;
+
             while (!cts.IsCancellationRequested)
             {
-                while (_bufferFilesQueue!.Count == 0 && !cts.IsCancellationRequested)
-                    await Task.Delay(100, cts);
+                i++;
+                if (i % 20 == 0)
+                {
+                    _log.Fatal("Множество попыток перезапуска ffmpeg завершились неудачно. Дальнейшее выполнение невозможно. Требуется ручное вмешательство.");
+                    break;
+                }
 
                 var outFile = PrepareToTranscoding(resultDir);
 
-                Console.WriteLine("///StartTranscoding///");
+                _log.Information("Запуск ffmpeg...");
 
                 var ffmpegPsi = new ProcessStartInfo
                 {
@@ -49,15 +67,30 @@ namespace TwitchStreamsRecorder
                     RedirectStandardError = true,
                     CreateNoWindow = true
                 };
-                FfmpegProc = Process.Start(ffmpegPsi) ?? throw new Exception("Failed to START ffmpeg");
+
+                try
+                {
+                    FfmpegProc = Process.Start(ffmpegPsi);
+                }
+                catch (Exception ex)
+                {
+                    _log.Fatal(ex, "Запуск ffmpeg не удался. Ошибка:");
+                    return;
+                }
+
+                if (FfmpegProc is null)
+                {
+                    _log.Fatal("Запуск ffmpeg не удался.");
+                    return;
+                }
+
+                _log.Information("ffmpeg успешно запущен.");
 
                 var writer = FfmpegProc.StandardInput;
                 var stdin = writer.BaseStream;
 
                 FfmpegProc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.Error.WriteLine(e.Data); };
                 FfmpegProc.BeginErrorReadLine();
-
-                Console.WriteLine("ffmpeg was STARTED");
 
                 try
                 {
@@ -66,11 +99,15 @@ namespace TwitchStreamsRecorder
                     if (currentBufferFile is null && _bufferFilesQueue.IsCompleted)
                     {
                         await FfmpegProc.WaitForExitAsync(cts);
-                        Console.WriteLine("ffmpeg finished transcoding - all buffers processed");
 
-                        string finalDir = FinalizeOutputFolder(resultDir);
+                        _log.Information("ffmpeg успешно закончил перекодирование - все буффер файлы оработаны.");
 
-                        await TelegramBotService.SendFinalStreamVOD(Directory.GetFiles(finalDir, "*.mp4"), cts);
+                        string? finalDir = FinalizeOutputFolder(resultDir);
+
+                        if (finalDir != null)
+                        {
+                            await tgChannel.SendFinalStreamVOD(Directory.GetFiles(finalDir, "*.mp4"), cts);
+                        }
 
                         FfmpegProc.Dispose();
                         FfmpegProc = null;
@@ -78,14 +115,13 @@ namespace TwitchStreamsRecorder
                         return;
                     }
                 }
-                catch (IOException io) when (io.InnerException is
-                { HResult: unchecked((int)0x8007006D) } /*ERROR_BROKEN_PIPE*/)
+                catch (IOException io) when (io.InnerException is { HResult: unchecked((int)0x8007006D) } /*ERROR_BROKEN_PIPE*/)
                 {
-                    Console.Error.WriteLine("ffmpeg pipe closed unexpectedly — restarting...");
+                    _log.Warning(io, "ffmpeg pipe-поток закрылся неожиданно - перезапуск ffmpeg...");
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($"Fatal error in transcoding: {ex} - restarting...");
+                    _log.Warning(ex, "Неожиданное заверешние ffmpeg - перезапуск...");
                 }
                 finally
                 {
@@ -104,7 +140,7 @@ namespace TwitchStreamsRecorder
                                 FfmpegProc.Kill(entireProcessTree: true);
                         }
 
-                        Console.WriteLine($"ffmpeg exit code = {FfmpegProc!.ExitCode}");
+                        _log.Warning($"ffmpeg exit code = {FfmpegProc!.ExitCode}");
                         FfmpegProc.Dispose();
                         FfmpegProc = null;
                     }
@@ -141,7 +177,7 @@ namespace TwitchStreamsRecorder
                     );
                 var buffer = new byte[_bufferSize];
 
-                Console.WriteLine($"START read buffer file {bufferFile}, transfer data to ffmpeg stream input and transcoding video");
+                _log.Information($"Начало чтение буффер файла ({bufferFile}) и перекодирование видео потока.");
 
                 var stableFor = TimeSpan.Zero;
 
@@ -174,16 +210,17 @@ namespace TwitchStreamsRecorder
 
                     if (_bufferFilesQueue!.IsAddingCompleted && bufferFileStream.Length == readPos)
                     {
-                        Console.WriteLine($"Complete read buffer file {bufferFile} and transfer data to ffmpeg stream input");
+                        _log.Information($"Заверешние чтения буффер файла ({bufferFile}).");
                         break;
                     }
 
                     await Task.Delay(50, cts);
                 }
 
-                if (_bufferFilesQueue.IsAddingCompleted && !_bufferFilesQueue.TryTake(out bufferFile))
+                if (_bufferFilesQueue.IsAddingCompleted)
                 {
-                    bufferFile = null;
+                    if (!_bufferFilesQueue.TryTake(out bufferFile))
+                        bufferFile = null;
                 }
                 else if (bufferFile is null)
                 {
@@ -200,7 +237,7 @@ namespace TwitchStreamsRecorder
             stdIn.Close();
             return (null, 0);
         }
-        private static string FinalizeOutputFolder(string transcodeResultDirectory)
+        private string? FinalizeOutputFolder(string transcodeResultDirectory)
         {
             var src = transcodeResultDirectory.TrimEnd(Path.DirectorySeparatorChar);
             var dst = src + "_FINISHED";
@@ -212,11 +249,12 @@ namespace TwitchStreamsRecorder
             try
             {
                 Directory.Move(src, dst);
-                Console.WriteLine($"Folder renamed → {dst}");
+                _log.Information($"Директория с результатами перекодирования переименована → {dst}.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Rename failed: {ex.Message}");
+                _log.Error(ex, "Исключение при попытке переименовать директорию с результатами перекодирования. Обработанные файлв не будут загружены в телеграм. Требуется ручное вмешательство. Ошибка:");
+                dst = null;
             }
 
             return dst;

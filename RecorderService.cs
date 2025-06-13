@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using Serilog;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 
 namespace TwitchStreamsRecorder
@@ -8,14 +9,17 @@ namespace TwitchStreamsRecorder
         private int _bufferFileIndex = 0;
         private int _bufferSize;
         private BlockingCollection<string>? _bufferFilesQueue;
-        private readonly List<Task> _pendingBufferCopies;
+        private readonly ConcurrentQueue<Task> _pendingBufferCopies;
         private Process? _streamlinkProc;
 
         public Process? StreamlinkProc { get => _streamlinkProc; set => _streamlinkProc = value; }
 
-        public RecorderService(List<Task> pendingBufferCopies)
+        private readonly ILogger _log;
+
+        public RecorderService(ConcurrentQueue<Task> pendingBufferCopies, ILogger log)
         {
             _pendingBufferCopies = pendingBufferCopies;
+            _log = log.ForContext("Source", "Recorder");
         }
         private string PrepareToRecording(string recordBufferDirectory)
         {
@@ -25,32 +29,61 @@ namespace TwitchStreamsRecorder
 
             return bufferFile;
         }
-        public async Task StartRecording(string twitchChannelLink, string pathForRecordBuffer, CancellationToken cts)
+        public async Task StartRecording(string twitchChannelLink, string pathForRecordBuffer, CancellationToken cts, string OAuthToken)
         {
+            if (_bufferFilesQueue is null)
+                throw new InvalidOperationException($"[{DateTime.Now:HH:mm:ss}] Buffer queue is not set. Call SetBufferQueue() first.");
+
+
             if (StreamlinkProc is { HasExited: false }) return;
 
             var bufferDir = DirectoriesManager.CreateRecordBufferDirectory(pathForRecordBuffer);
 
+            int i = 0;
+
             while (!cts.IsCancellationRequested && Program.IsLive)
             {
+                i++;
+                if (i % 20 == 0)
+                {
+                    _log.Fatal("Множество попыток перезапуска Streamlink завершились неудачно. Дальнейшее выполнение невозможно. Требуется ручное вмешательство.");
+                    break;
+                }
+
                 var bufferFile = PrepareToRecording(bufferDir);
 
-                Console.WriteLine("///StartRecording///");
+
+                _log.Information("Запуск Streamlink...");
 
                 var streamlinkPsi = new ProcessStartInfo
                 {
                     FileName = "streamlink.exe",
-                    Arguments = $"--stdout --twitch-disable-ads {twitchChannelLink} best",
+                    Arguments = $"--stdout --twitch-disable-ads --twitch-api-header \"Authorization=Bearer {OAuthToken}\" {twitchChannelLink} best",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true
                 };
-                StreamlinkProc = Process.Start(streamlinkPsi) ?? throw new Exception("Failed to START streamlink");
 
-                Console.WriteLine("Streamlink was STARTED");
+                try
+                {
+                    StreamlinkProc = Process.Start(streamlinkPsi);
+                }
+                catch (Exception ex)
+                {
+                    _log.Fatal(ex, "Запуск Streamlink не удался. Ошибка:");
+                    return;
+                }
+                
+                if (StreamlinkProc is null)
+                {
+                    _log.Fatal("Запуск Streamlink не удался.");
+                    return;
+                }
 
-                _pendingBufferCopies.Add
+                _log.Information("Streamlink успешно запущен.");
+
+                _pendingBufferCopies.Enqueue
                     (
                     StartWritingFragmentsToBufferAsync(StreamlinkProc.StandardOutput.BaseStream, bufferFile, cts).ContinueWith(t =>
                     {
@@ -66,29 +99,28 @@ namespace TwitchStreamsRecorder
 
                 if (StreamlinkProc.ExitCode == 0 || StreamlinkProc.ExitCode == 1)
                 {
-                    Console.WriteLine("STOP recording — stream offline - streamlink finished");
+                    _log.Information("Streamlink закончил работу - Стрим завершён - Запись остановлена");
                     break;
                 }
 
-                Console.WriteLine($"!!! Streamlink CRASHED with exit code {StreamlinkProc.ExitCode} — restarting…");
+                _log.Warning($"!!! Streamlink CRASHED with exit code {StreamlinkProc.ExitCode} — restarting…");
             }
 
             try
             {
-                await Task.WhenAll(_pendingBufferCopies);
+                await Task.WhenAll(_pendingBufferCopies.ToArray());
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Copy failed: {ex}");
+                _log.Error(ex, "Запись буффер файлов не завершилась корректно. Вероятнее всего конечный результат будет повреждён. Ошибка:");
             }
             finally
             {
                 _bufferFilesQueue!.CompleteAdding(); 
             }
 
-            // цикл закончился штатно
             StreamlinkProc?.Dispose();
-            StreamlinkProc = null;          // ← ключевая строчка
+            StreamlinkProc = null;
         }
         public async Task ResetAsync(CancellationToken cts)
         {
@@ -113,6 +145,7 @@ namespace TwitchStreamsRecorder
         }
         private Task StartWritingFragmentsToBufferAsync(Stream stdout, string bufferFile, CancellationToken cts)
         {
+            _log.Information($"Запущен процесс записи потокового вывода Streamlink в буффер файл ({bufferFile})");
             return Task.Run(async () =>
             {
                 await using var bufferFileStream = new FileStream
@@ -122,7 +155,7 @@ namespace TwitchStreamsRecorder
 
                 await stdout.CopyToAsync(bufferFileStream, _bufferSize, cts);
 
-                Console.WriteLine($"Finished writing to the buffer file {bufferFile}");
+                _log.Information($"Запись в буффер файл ({bufferFile}) успешно завершена.");
             }, cts);
         }
     }

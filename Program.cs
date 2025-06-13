@@ -17,9 +17,10 @@
 }
 */
 
+using Serilog;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Text.Json.Serialization;
+using Telegram.Bot;
 using TwitchLib.Api;
 using TwitchLib.EventSub.Websockets;
 using TwitchLib.EventSub.Websockets.Core.EventArgs.Channel;
@@ -46,13 +47,15 @@ internal class Program
 
     private static TwitchLib.EventSub.Core.AsyncEventHandler<ChannelUpdateArgs>? _channelUpdHandler;
 
+    private static ILogger? _log;
+
     // ========== ENTRY ========== //
     private static async Task Main()
     {
         Console.WriteLine("Twitch auto‑recorder starting…\n");
 
         var bufferFilesQueue = new BlockingCollection<string>();
-        var pendingBufferCopies = new List<Task>();
+        var pendingBufferCopies = new ConcurrentQueue<Task>();
 
         Task? recordingTask = null;
         Task? transcodingTask = null;
@@ -62,48 +65,77 @@ internal class Program
         var config  = json.LoadConfig(Path.Combine(AppContext.BaseDirectory, "recorder.json"));
         var twitchLink = $"twitch.tv/{config.ChannelLogin}";
         var bufferSize = 512 * 1024;
-        
-        var recorder = new RecorderService(pendingBufferCopies);
-        var transcoder = new TranscoderService();
+
+        var tgBot = new TelegramBotClient(config.TelegramBotToken);
+
+        Log.Logger = Logging.InitRoot(tgBot, 448442642);
+        // ChannelSession.cs (ctor)
+        var channelPath = Path.Combine(AppContext.BaseDirectory,
+                                       $"{config.ChannelLogin}_{DateTime.UtcNow:yyyyMMdd}.log");
+
+        var channelLogger = new LoggerConfiguration()
+            .MinimumLevel.ControlledBy(Logging.Level)          // тот же переключатель
+            .WriteTo.Logger(Log.Logger)                        // дублируем в root (консоль+TG)
+            .WriteTo.File(channelPath,
+                          rollingInterval: RollingInterval.Day,
+                          outputTemplate: Logging.Template)
+            .CreateLogger()
+            .ForContext("Channel", config.ChannelLogin);       // подставляет ({Channel})
+
+        _log = channelLogger;     // храните в поле сессии
+
+        var recorder = new RecorderService(pendingBufferCopies, _log);
+        var transcoder = new TranscoderService(_log);
 
         var api = new TwitchAPI();
 
         api.Settings.ClientId = config.ClientId;
         api.Settings.AccessToken = config.UserToken;
 
-        var token = new TokenRefresher(config, api, _httpClient);
+        var token = new TokenRefresher(config, api, _httpClient, _log);
 
-        await token.RefreshAccessTokenAsync(true, () => json.SaveConfig(config, Path.Combine(AppContext.BaseDirectory, "recorder.json")));
+        await token.RefreshAccessTokenAsync(true, () => json.SaveConfig(config, ConfigService.GetDefaultConfigPath()));
 
         var channelId = await ResolveChannelIdAsync(config.ChannelLogin, api);
-        Console.WriteLine($"channelId = {channelId} for user login = {config.ChannelLogin}\n");
 
-        var eventSubscribe = new TwitchEventSubscribeManager(api, _ws, config, channelId);
+        if (string.IsNullOrEmpty(channelId))
+            return;
+
+        _log.Information($"channelId = {channelId} for user login = {config.ChannelLogin}");
+
+        var eventSubscribe = new TwitchEventSubscribeManager(api, _ws, config, channelId, _log);
+
+        var tgChannel = new TelegramChannelService(config.TelegramChannelId, tgBot, _log);
 
         _ws.WebsocketConnected += async (_, __) =>
         {
-            Console.WriteLine($"WebSocket connected (session {_ws.SessionId})");
+            _log.Information($"WebSocket connected (session {_ws.SessionId})");
             await eventSubscribe.SubscribeStreamStatusAsync(token, json);
         };
-        _ws.WebsocketReconnected += async(_, __) =>
+        _ws.WebsocketReconnected += (_, __) =>
         {
-            Console.WriteLine("WebSocket reconnected — re‑subscribing…");
-            await eventSubscribe.SubscribeStreamStatusAsync(token, json);
+            _log.Information("WebSocket reconnected — re‑subscribing…");
+            return Task.CompletedTask;
         };
 
         _ws.WebsocketDisconnected += async (_, __) =>
         {
-            Console.WriteLine("WebSocket disconnected");
+            _log.Warning("WebSocket disconnected");
 
-            await token.RefreshAccessTokenAsync(true, () => json.SaveConfig(config, Path.Combine(AppContext.BaseDirectory, "recorder.json")));
+            await token.RefreshAccessTokenAsync(true, () => json.SaveConfig(config, ConfigService.GetDefaultConfigPath()));
 
             await eventSubscribe.EnsureConnectedAsync();
         };
 
-        _ws.ErrorOccurred += (_, e) => { Console.WriteLine($"WebSocket error: {e.Message}"); return Task.CompletedTask; };
+        _ws.ErrorOccurred += (_, e) => 
+        {
+            _log.Warning(e.Message, "WebSocket error:");
+            return Task.CompletedTask; 
+        };
 
         _ws.StreamOnline += async (_, e) =>
-        { 
+        {
+            _log.Information("Стрим запущен, начало запсиси...");
             IsLive = true;
 
             var sessionDirectory = DirectoriesManager.CreateSessionDirectory(null, config.ChannelLogin);
@@ -111,12 +143,157 @@ internal class Program
             recorder.SetBufferQueue(bufferFilesQueue, bufferSize);
             transcoder.SetBufferQueue(bufferFilesQueue, bufferSize);
 
-            recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, _cts.Token));
-            transcodingTask = Task.Run(() => transcoder.StartTranscoding(sessionDirectory, _cts.Token));
+            recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, _cts.Token, config.UserToken));
+            transcodingTask = Task.Run(() => transcoder.StartTranscoding(sessionDirectory, tgChannel, _cts.Token));
 
             var (title, category) = await GetStreamInfoAsync(api, channelId);
 
-            await TelegramBotService.SendStreamOnlineMsg(_cts.Token, twitchLink, title, category);
+            await tgChannel.SendStreamOnlineMsg(title, category, _cts.Token);
+
+            if (_channelUpdHandler == null)
+            {
+                _channelUpdHandler = async (sender, e) =>
+                {
+                    _debounceCts?.Cancel();
+                    _debounceCts?.Dispose();
+                    _debounceCts = new CancellationTokenSource();
+
+                    try
+                    {
+                        await Task.Delay(DebounceDelay, _debounceCts.Token);
+
+                        var (newTitle, newCategory) = await GetStreamInfoAsync(api, channelId);
+
+                        await tgChannel.UpdateStreamOnlineMsg(newTitle, newCategory, _cts.Token);
+                    }
+                    catch (OperationCanceledException) { }
+                };
+
+                _ws.ChannelUpdate += _channelUpdHandler;
+            }
+        };
+
+        _ws.StreamOffline += async (_, e) => 
+        {
+            _log.Information("Стрим завершён.");
+
+            IsLive = false;
+
+            _ = recorder.ResetAsync(_cts.Token);
+            _ = transcoder.ResetAsync(_cts.Token);
+
+            bufferFilesQueue = new BlockingCollection<string>();
+
+            pendingBufferCopies = new ConcurrentQueue<Task>();
+
+            await Task.Delay(TimeSpan.FromSeconds(10));
+
+            _ws.ChannelUpdate -= _channelUpdHandler;
+            _channelUpdHandler = null;
+
+            await tgChannel.FinalizeStreamOnlineMsg(_cts.Token);
+        };
+
+        await _ws.ConnectAsync();
+
+        (recordingTask, transcodingTask) = await CheckLiveAndStartAsync(api, twitchLink, channelId, recorder, transcoder, config, bufferFilesQueue, bufferSize, tgChannel);
+
+        _ = Task.Run(() => token.RefreshLoopAsync(() => json.SaveConfig(config, ConfigService.GetDefaultConfigPath()), _cts.Token));
+        _ = Task.Run(() => PendingQueueWatchDogAsync(pendingBufferCopies));
+
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder);
+        };
+        AppDomain.CurrentDomain.ProcessExit += (_, __) => Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder);
+
+        _shutdownDone.Wait();
+    }
+    private static void Shutdown(BlockingCollection<string> bufferFilesQueue, ConcurrentQueue<Task> pendingBufferCopies, Task? recordingTask, Task transcodingTask, RecorderService recorder, TranscoderService transcoder)
+    {
+        if (Interlocked.Exchange(ref _shutdownStarted, 1) != 0)
+            return;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                _cts.Cancel();
+
+                await Task.WhenAll(Safe(recordingTask), Safe(transcodingTask));
+
+                bufferFilesQueue.CompleteAdding();
+
+                await Task.WhenAll([.. pendingBufferCopies]);
+               
+                await KillProcessAsync(recorder.StreamlinkProc);
+                recorder.StreamlinkProc = null;
+
+                await KillProcessAsync(transcoder.FfmpegProc);
+                transcoder.FfmpegProc = null;
+
+
+                await Safe(() => _ws?.DisconnectAsync()!);
+
+                _log!.Information("Shutdown finished.");
+            }
+            catch (Exception ex)
+            {
+                _log!.Warning(ex, "Shutdown failed.");
+            }
+            finally
+            {
+                _shutdownDone.Set();
+            }
+        });
+    }
+
+    static async Task KillProcessAsync(Process? p)
+    {
+        if (p is null) return;
+
+        try
+        {
+            if (!p.HasExited)
+                p.Kill(entireProcessTree: true);
+
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+            try
+            {
+                await p.WaitForExitAsync(timeoutCts.Token);
+            }
+            catch (OperationCanceledException) { }
+        }
+        finally
+        {
+            p.Dispose();
+        }
+    }
+
+    static Task Safe(Task? t) => t ?? Task.CompletedTask;
+    static Task Safe(Func<Task> asyncCall) => asyncCall == null ? Task.CompletedTask : Safe(asyncCall());
+
+    private static async Task<(Task? recordingTask, Task? transcodingTask)> CheckLiveAndStartAsync(TwitchAPI api, string twitchLink, string channelId, RecorderService recorder, TranscoderService transcoder, Config config, BlockingCollection<string> bufferFilesQueue, int bufferSize, TelegramChannelService tgChannel)
+    {
+        var live = await api.Helix.Streams.GetStreamsAsync(userIds: [channelId]);
+
+        if (live.Streams.Length > 0)
+        {
+            _log!.Information("Стрим уже идёт, начало записи (но не с начала стрима)...");
+            IsLive = true;
+            var sessionDirectory = DirectoriesManager.CreateSessionDirectory(null, config.ChannelLogin);
+
+            recorder.SetBufferQueue(bufferFilesQueue, bufferSize);
+            transcoder.SetBufferQueue(bufferFilesQueue, bufferSize);
+
+            var recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, _cts.Token, config.UserToken));
+            var transcodingTask = Task.Run(() => transcoder.StartTranscoding(sessionDirectory, tgChannel, _cts.Token));
+
+            var (title, category) = await GetStreamInfoAsync(api, channelId);
+
+            await tgChannel.SendStreamOnlineMsg(title, category, _cts.Token);
 
             if (_channelUpdHandler == null)
             {
@@ -131,163 +308,17 @@ internal class Program
 
                         var (newTitle, newCategory) = await GetStreamInfoAsync(api, channelId);
 
-                        await TelegramBotService.UpdateStreamOnlineMsg(newTitle, newCategory, _cts.Token);
+                        await tgChannel.UpdateStreamOnlineMsg(newTitle, newCategory, _cts.Token);
                     }
-                    catch (OperationCanceledException)
-                    {
-
-                    }
+                    catch (OperationCanceledException){}
                 };
 
                 _ws.ChannelUpdate += _channelUpdHandler;
             }
-        };
-
-        _ws.StreamOffline += async (_, e) => 
-        {
-            IsLive = false;
-
-            _ = recorder.ResetAsync(_cts.Token);
-            _ = transcoder.ResetAsync(_cts.Token);
-
-            bufferFilesQueue = [];
-            pendingBufferCopies.Clear();
-
-            await Task.Delay(TimeSpan.FromSeconds(10));
-
-            _ws.ChannelUpdate -= _channelUpdHandler;
-
-            await TelegramBotService.FinalizeStreamOnlineMsg(_cts.Token);
-        };
-
-        await _ws.ConnectAsync();
-
-        await CheckLiveAndStartAsync(api, twitchLink, channelId, recorder, transcoder, config, recordingTask!, transcodingTask!, bufferFilesQueue, bufferSize);
-
-        _ = Task.Run(() => token.RefreshLoopAsync(() => json.SaveConfig(config, Path.Combine(AppContext.BaseDirectory, "recorder.json")), _cts.Token));
-        _ = Task.Run(() => PendingQueueWatchDogAsync(pendingBufferCopies));
-
-        Console.CancelKeyPress += (_, e) =>
-        {
-            e.Cancel = true;
-            Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder);
-        };
-        AppDomain.CurrentDomain.ProcessExit += (_, __) => Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder);
-
-        _shutdownDone.Wait();
-    }
-    private static void Shutdown(BlockingCollection<string> bufferFilesQueue, List<Task> pendingBufferCopies, Task? recordingTask, Task transcodingTask, RecorderService recorder, TranscoderService transcoder)
-    {
-        if (Interlocked.Exchange(ref _shutdownStarted, 1) != 0)
-            return;
-
-        Task.Run(async () =>
-        {
-            try
-            {
-                _cts.Cancel();                // 1) посылаем отмену
-
-                // 2) ждём основные фоновые задачи
-                await Task.WhenAll(Safe(recordingTask), Safe(transcodingTask));
-
-                // 3) закрываем очередь, чтобы FeedBuffersAsync вышел, если ещё нет
-                bufferFilesQueue.CompleteAdding();
-
-                // 4) дожидаемся «хвостовых» копий из pendingCopies
-                await Task.WhenAll([.. pendingBufferCopies]);
-
-                // 5) мягко ждём процессы
-               
-                await KillProcessAsync(recorder.StreamlinkProc);
-                recorder.StreamlinkProc = null;
-
-                await KillProcessAsync(transcoder.FfmpegProc);
-                transcoder.FfmpegProc = null;
-
-                // 6) закрываем WebSocket
-                await Safe(() => _ws?.DisconnectAsync()!);
-
-                Console.WriteLine("Shutdown finished.");
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Shutdown error: {ex}");
-            }
-            finally
-            {
-                _shutdownDone.Set();          // разблокируем Main / ProcessExit
-            }
-        });
-    }
-
-    static async Task KillProcessAsync(Process? p)
-    {
-        if (p is null) return;
-
-        try
-        {
-            if (!p.HasExited)
-                p.Kill(entireProcessTree: true);     // мягкий Kill ⇒ EOF в stdin/pipe
-
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-
-            try
-            {
-                await p.WaitForExitAsync(timeoutCts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-            }
+            return (recordingTask, transcodingTask);
         }
-        finally
-        {
-            p.Dispose();
-        }
-    }
 
-    static Task Safe(Task? t) => t ?? Task.CompletedTask;
-    static Task Safe(Func<Task> asyncCall) => asyncCall == null ? Task.CompletedTask : Safe(asyncCall());
-
-    private static async Task CheckLiveAndStartAsync(TwitchAPI api, string twitchLink, string channelId, RecorderService recorder, TranscoderService transcoder ,Config config, Task recordingTask, Task transcodingTask, BlockingCollection<string> bufferFilesQueue, int bufferSize)
-    {
-        var live = await api.Helix.Streams.GetStreamsAsync(userIds: [channelId]);
-
-        if (live.Streams.Length > 0)
-        {
-            IsLive = true;
-            var sessionDirectory = DirectoriesManager.CreateSessionDirectory(null, config.ChannelLogin);
-
-            recorder.SetBufferQueue(bufferFilesQueue, bufferSize);
-            transcoder.SetBufferQueue(bufferFilesQueue, bufferSize);
-
-            recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, _cts.Token));
-            transcodingTask = Task.Run(() => transcoder.StartTranscoding(sessionDirectory, _cts.Token));
-
-            var (title, category) = await GetStreamInfoAsync(api, channelId);
-
-            await TelegramBotService.SendStreamOnlineMsg(_cts.Token, twitchLink, title, category);
-
-            _channelUpdHandler = async (sender, e) =>
-            {
-                _debounceCts?.Cancel();
-                _debounceCts = new CancellationTokenSource();
-
-                try
-                {
-                    await Task.Delay(DebounceDelay, _debounceCts.Token);
-
-                    var (newTitle, newCategory) = await GetStreamInfoAsync(api, channelId);
-
-                    await TelegramBotService.UpdateStreamOnlineMsg(newTitle, newCategory, _cts.Token);
-                }
-                catch (OperationCanceledException)
-                {
-
-                }
-            };
-
-            _ws.ChannelUpdate += _channelUpdHandler;
-        }
+        return (null, null);
     }
     static async Task<(string title, string game)> GetStreamInfoAsync(TwitchAPI api, string channelId)
     {
@@ -300,20 +331,22 @@ internal class Program
     {
         var users = await api.Helix.Users.GetUsersAsync(logins: [login]);
         if (users.Users.Length == 0)
-            throw new Exception("login not found in Helix");
+        {
+            _log!.Warning("Twitch логин не найден в Helix. Неверный логин или проблемы с подключением. Дальнейшее корректное выполнение невозможно.");
+            return string.Empty;
+        }
         return users.Users[0].Id;
     }
-    private static async Task PendingQueueWatchDogAsync(List<Task> pendingBufferCopies)
+    private static async Task PendingQueueWatchDogAsync(ConcurrentQueue<Task> pendingBufferCopies)
     {
         while (!_cts.IsCancellationRequested)
         {
             await Task.Delay(TimeSpan.FromMinutes(5), _cts.Token);
-            if (IsLive && pendingBufferCopies.Count != 0)
+            if (IsLive)
             {
-                pendingBufferCopies.RemoveAll(t => t.IsCompleted);
+                while (pendingBufferCopies.TryPeek(out var t) && t.IsCompleted)
+                    pendingBufferCopies.TryDequeue(out _);
             }
         }
     }
 }
-[JsonSerializable(typeof(Config))]
-internal partial class ConfigJsonContext : JsonSerializerContext { }

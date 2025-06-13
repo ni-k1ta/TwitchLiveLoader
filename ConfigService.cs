@@ -10,28 +10,47 @@ namespace TwitchStreamsRecorder
         public Config LoadConfig(string pathToJson)
         {
             if (!File.Exists(pathToJson))
-                throw new FileNotFoundException($"Конфиг-файл \"recorder.json\" не найден по пути {pathToJson}");
+                throw new FileNotFoundException($"Конфиг-файл не найден: {pathToJson}");
 
-            var json = File.ReadAllText(pathToJson);
+            try
+            {
+                var json = File.ReadAllText(pathToJson);
 
-            var cfg = JsonSerializer.Deserialize(json, ConfigJsonContext.Default.Config)
-                      ?? throw new Exception("invalid recorder.json");
+                var cfg = JsonSerializer.Deserialize(json, ConfigJsonContext.Default.Config)
+                          ?? throw new InvalidDataException($"Файл конфигурации пуст или имеет неверную структуру.");
 
-            return cfg;
+                cfg.Validate();
+
+                return cfg;
+            }
+            catch (JsonException je)
+            {
+                throw new InvalidDataException($"Не удалось разобрать JSON в файле {pathToJson}: {je.Message}", je);
+            }
+            catch (IOException io)
+            {
+                throw new IOException($"Ошибка чтения файла {pathToJson}: {io.Message}", io);
+            }
         }
 
         public void SaveConfig(Config cfg, string pathToJson)
         {
-            lock (_lock)
-            { 
-                var tmp = cfg.OutputDir;
-                cfg.OutputDir = null;
-
-                var json = JsonSerializer.Serialize(cfg, _opt);
-                File.WriteAllText(pathToJson, json);
-
-                cfg.OutputDir = tmp;  
+            try
+            {
+                lock (_lock)
+                {
+                    var tmp = Path.ChangeExtension(pathToJson, ".tmp");
+                    var json = JsonSerializer.Serialize(cfg, _opt);
+                    File.WriteAllText(tmp, json);
+                    File.Replace(tmp, pathToJson, null);
+                }
+            }
+            catch (IOException io)
+            {
+                throw new IOException($"Ошибка записи в файл {pathToJson}: {io.Message}", io);
             }
         }
+
+        internal static string GetDefaultConfigPath() => Path.Combine(AppContext.BaseDirectory, "recorder.json");
     }
 }
