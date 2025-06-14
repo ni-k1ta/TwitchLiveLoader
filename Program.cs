@@ -28,17 +28,15 @@ using TwitchStreamsRecorder;
 
 internal class Program
 {
-    // ========== Twitch clients ========== //
     private static readonly EventSubWebsocketClient _ws = new();
 
-    private static readonly HttpClient _httpClient = new(); // reuse HttpClient
+    private static readonly HttpClient _httpClient = new();
 
-    // ========== runtime ========== //
     private static volatile bool _isLive;
     private static readonly CancellationTokenSource _cts = new();
 
     static readonly ManualResetEventSlim _shutdownDone = new();
-    static int _shutdownStarted;               // 0 → ещё нет, 1 → уже иду
+    static int _shutdownStarted;              
 
     public static bool IsLive { get => _isLive; set => _isLive = value; }
 
@@ -49,7 +47,7 @@ internal class Program
 
     private static ILogger? _log;
 
-    // ========== ENTRY ========== //
+
     private static async Task Main()
     {
         Console.WriteLine("Twitch auto‑recorder starting…\n");
@@ -69,20 +67,20 @@ internal class Program
         var tgBot = new TelegramBotClient(config.TelegramBotToken);
 
         Log.Logger = Logging.InitRoot(tgBot, 448442642);
-        // ChannelSession.cs (ctor)
+
         var channelPath = Path.Combine(AppContext.BaseDirectory,
-                                       $"{config.ChannelLogin}_{DateTime.UtcNow:yyyyMMdd}.log");
+                                       $"{config.ChannelLogin}_.log");
 
         var channelLogger = new LoggerConfiguration()
-            .MinimumLevel.ControlledBy(Logging.Level)          // тот же переключатель
-            .WriteTo.Logger(Log.Logger)                        // дублируем в root (консоль+TG)
+            .MinimumLevel.ControlledBy(Logging.Level)          
+            .WriteTo.Logger(Log.Logger)                        
             .WriteTo.File(channelPath,
                           rollingInterval: RollingInterval.Day,
                           outputTemplate: Logging.Template)
             .CreateLogger()
-            .ForContext("Channel", config.ChannelLogin);       // подставляет ({Channel})
+            .ForContext("Channel", config.ChannelLogin);       
 
-        _log = channelLogger;     // храните в поле сессии
+        _log = channelLogger;
 
         var recorder = new RecorderService(pendingBufferCopies, _log);
         var transcoder = new TranscoderService(_log);
@@ -96,10 +94,21 @@ internal class Program
 
         await token.RefreshAccessTokenAsync(true, () => json.SaveConfig(config, ConfigService.GetDefaultConfigPath()));
 
-        var channelId = await ResolveChannelIdAsync(config.ChannelLogin, api);
+        string channelId = string.Empty;
 
-        if (string.IsNullOrEmpty(channelId))
-            return;
+        while (true)
+        {
+            channelId = await ResolveChannelIdAsync(config.ChannelLogin, api);
+            
+            if (string.IsNullOrEmpty(channelId))
+            {
+                _log.Information("Повторная попытка получить Twitch логин в Helix через 1 мин...");
+                await Task.Delay(TimeSpan.FromMinutes(1));
+                continue;
+            }
+
+            break;
+        }
 
         _log.Information($"channelId = {channelId} for user login = {config.ChannelLogin}");
 
@@ -114,7 +123,7 @@ internal class Program
         };
         _ws.WebsocketReconnected += (_, __) =>
         {
-            _log.Information("WebSocket reconnected — re‑subscribing…");
+            _log.Information("WebSocket reconnected — re‑subscribing (подписки будут пересозданы, т.к. прежний ID WebSocket'а более невалидный)…");
             return Task.CompletedTask;
         };
 
@@ -201,16 +210,33 @@ internal class Program
         _ = Task.Run(() => token.RefreshLoopAsync(() => json.SaveConfig(config, ConfigService.GetDefaultConfigPath()), _cts.Token));
         _ = Task.Run(() => PendingQueueWatchDogAsync(pendingBufferCopies));
 
+        var bufferCleaner = new BufferCleanerService(
+                 root: AppContext.BaseDirectory,
+                 retention: TimeSpan.FromDays(7),
+                 logger: _log,
+                 stop: _cts.Token);
+        _ = bufferCleaner.RunAsync();
+
+        var resultCleaner = new ResultCleanerService(
+                 root: AppContext.BaseDirectory,
+                 retention: TimeSpan.FromDays(15),
+                 logger: _log,
+                 stop: _cts.Token);
+        _ = resultCleaner.RunAsync();
+
+        var emptyCleaner = new EmptyDirectoryCleaner(AppContext.BaseDirectory, _cts.Token);
+        _ = emptyCleaner.RunAsync();
+
         Console.CancelKeyPress += (_, e) =>
         {
             e.Cancel = true;
-            Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder);
+            Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder, eventSubscribe, token, json);
         };
-        AppDomain.CurrentDomain.ProcessExit += (_, __) => Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder);
+        AppDomain.CurrentDomain.ProcessExit += (_, __) => Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder, eventSubscribe, token, json);
 
         _shutdownDone.Wait();
     }
-    private static void Shutdown(BlockingCollection<string> bufferFilesQueue, ConcurrentQueue<Task> pendingBufferCopies, Task? recordingTask, Task transcodingTask, RecorderService recorder, TranscoderService transcoder)
+    private static void Shutdown(BlockingCollection<string> bufferFilesQueue, ConcurrentQueue<Task> pendingBufferCopies, Task? recordingTask, Task transcodingTask, RecorderService recorder, TranscoderService transcoder, TwitchEventSubscribeManager eventSubscribe, TokenRefresher token, ConfigService json)
     {
         if (Interlocked.Exchange(ref _shutdownStarted, 1) != 0)
             return;
@@ -233,6 +259,7 @@ internal class Program
                 await KillProcessAsync(transcoder.FfmpegProc);
                 transcoder.FfmpegProc = null;
 
+                await eventSubscribe.DeleteAllSubscriptionsAsync(token, json);
 
                 await Safe(() => _ws?.DisconnectAsync()!);
 
@@ -330,11 +357,13 @@ internal class Program
     private static async Task<string> ResolveChannelIdAsync(string login, TwitchAPI api)
     {
         var users = await api.Helix.Users.GetUsersAsync(logins: [login]);
+
         if (users.Users.Length == 0)
         {
             _log!.Warning("Twitch логин не найден в Helix. Неверный логин или проблемы с подключением. Дальнейшее корректное выполнение невозможно.");
             return string.Empty;
         }
+
         return users.Users[0].Id;
     }
     private static async Task PendingQueueWatchDogAsync(ConcurrentQueue<Task> pendingBufferCopies)

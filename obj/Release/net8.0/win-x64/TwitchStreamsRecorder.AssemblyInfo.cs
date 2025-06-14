@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TwitchStreamsRecorder")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+70903b5840a35a38b3659d5ff9f5b3bb787e9005")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+07c08165f2c9521d0e9968993defbdc68435cbd5")]
 [assembly: System.Reflection.AssemblyProductAttribute("TwitchStreamsRecorder")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TwitchStreamsRecorder")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
