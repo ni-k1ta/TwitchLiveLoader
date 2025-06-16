@@ -57,13 +57,19 @@ namespace TwitchStreamsRecorder
 
                 var streamlinkPsi = new ProcessStartInfo
                 {
-                    FileName = "streamlink.exe",
-                    Arguments = $"--stdout --twitch-disable-ads --twitch-api-header \"Authorization=Bearer {OAuthToken}\" {twitchChannelLink} best",
+                    FileName = "streamlink",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true
                 };
+
+                streamlinkPsi.ArgumentList.Add("--stdout");
+                streamlinkPsi.ArgumentList.Add("--twitch-disable-ads");
+                streamlinkPsi.ArgumentList.Add("--twitch-api-header");
+                streamlinkPsi.ArgumentList.Add($"Authorization=Bearer {OAuthToken}");
+                streamlinkPsi.ArgumentList.Add(twitchChannelLink);
+                streamlinkPsi.ArgumentList.Add("best");
 
                 try
                 {

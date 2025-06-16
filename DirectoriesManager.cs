@@ -8,8 +8,8 @@
 
             return CreateTimestampedDirectory(pathForSessionDirectory, safeLogin, "yyyy-MM-dd");
         }
-        public static string CreateRecordBufferDirectory(string? pathForBufferDirectory) => CreateTimestampedDirectory(pathForBufferDirectory, "buffer", "HH-mm");
-        public static string CreateTranscodeResultDirectory(string? pathForResultDirectory) => CreateTimestampedDirectory(pathForResultDirectory, "result", "HH-mm");
+        public static string CreateRecordBufferDirectory(string? pathForBufferDirectory) => CreateTimestampedDirectory(pathForBufferDirectory, "buffer", "HH_mm");
+        public static string CreateTranscodeResultDirectory(string? pathForResultDirectory) => CreateTimestampedDirectory(pathForResultDirectory, "result", "HH_mm");
 
         private static string Timestamp(string? format = "yyyy-MM-dd") => DateTime.Now.ToString(format);
         private static string CreateTimestampedDirectory(string? basePath, string directoryPrefix, string timestampFormat)

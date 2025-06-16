@@ -7,7 +7,7 @@ namespace TwitchStreamsRecorder
 {
     internal static class Logging
     {
-        public static readonly LoggingLevelSwitch Level = new(LogEventLevel.Verbose);
+        public static readonly LoggingLevelSwitch Level = new(LogEventLevel.Debug);
         public const string Template = "{Level:u3}: |{Source}| [{Timestamp:dd-MM-yyyy HH:mm:ss}] ({Channel}) {Message:lj}{NewLine}{Exception}";
         public static ILogger InitRoot(TelegramBotClient bot, long tgChatId)
         {

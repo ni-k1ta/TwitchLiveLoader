@@ -21,7 +21,7 @@ namespace TwitchStreamsRecorder
         {
             _log.Debug("Запуск мониторинга директорий с обработанными результатами.");
 
-            var timer = new PeriodicTimer(TimeSpan.FromHours(24));
+            var timer = new PeriodicTimer(TimeSpan.FromHours(24) + TimeSpan.FromSeconds(10));
 
             while (await timer.WaitForNextTickAsync(_stop))
             {
@@ -45,7 +45,7 @@ namespace TwitchStreamsRecorder
                 {
                     var info = new DirectoryInfo(bufDir);
 
-                    var age = DateTime.Now - info.CreationTime;
+                    var age = DateTime.Now - info.LastWriteTimeUtc;
                     if (age < _retention) continue;
 
                     try

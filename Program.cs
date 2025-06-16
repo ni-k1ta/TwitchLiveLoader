@@ -114,7 +114,7 @@ internal class Program
 
         var eventSubscribe = new TwitchEventSubscribeManager(api, _ws, config, channelId, _log);
 
-        var tgChannel = new TelegramChannelService(config.TelegramChannelId, tgBot, _log);
+        await using var tgChannel = new TelegramChannelService(config.TelegramChannelId, tgBot, 27680895, "8f219bef3d3da075c59e3084c7c0134c", _log);
 
         _ws.WebsocketConnected += async (_, __) =>
         {
@@ -155,10 +155,6 @@ internal class Program
             recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, _cts.Token, config.UserToken));
             transcodingTask = Task.Run(() => transcoder.StartTranscoding(sessionDirectory, tgChannel, _cts.Token));
 
-            var (title, category) = await GetStreamInfoAsync(api, channelId);
-
-            await tgChannel.SendStreamOnlineMsg(title, category, _cts.Token);
-
             if (_channelUpdHandler == null)
             {
                 _channelUpdHandler = async (sender, e) =>
@@ -180,6 +176,10 @@ internal class Program
 
                 _ws.ChannelUpdate += _channelUpdHandler;
             }
+
+            var (title, category) = await GetStreamInfoAsync(api, channelId);
+
+            await tgChannel.SendStreamOnlineMsg(title, category, _cts.Token);
         };
 
         _ws.StreamOffline += async (_, e) => 
@@ -227,15 +227,23 @@ internal class Program
         var emptyCleaner = new EmptyDirectoryCleaner(AppContext.BaseDirectory, _cts.Token);
         _ = emptyCleaner.RunAsync();
 
+        var logCleaner = new LogCleanerService(AppContext.BaseDirectory, "*.log", TimeSpan.FromDays(10), _log, _cts.Token);
+        _ = logCleaner.RunAsync();
+
         Console.CancelKeyPress += (_, e) =>
         {
             e.Cancel = true;
             Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder, eventSubscribe, token, json);
         };
-        AppDomain.CurrentDomain.ProcessExit += (_, __) => Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder, eventSubscribe, token, json);
+        //AppDomain.CurrentDomain.ProcessExit += (_, __) =>
+        //{
+        //    Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder, eventSubscribe, token, json);
+        //    _shutdownDone.Wait(TimeSpan.FromSeconds(10));
+        //};
 
         _shutdownDone.Wait();
     }
+
     private static void Shutdown(BlockingCollection<string> bufferFilesQueue, ConcurrentQueue<Task> pendingBufferCopies, Task? recordingTask, Task transcodingTask, RecorderService recorder, TranscoderService transcoder, TwitchEventSubscribeManager eventSubscribe, TokenRefresher token, ConfigService json)
     {
         if (Interlocked.Exchange(ref _shutdownStarted, 1) != 0)
@@ -251,15 +259,18 @@ internal class Program
 
                 bufferFilesQueue.CompleteAdding();
 
-                await Task.WhenAll([.. pendingBufferCopies]);
-               
+                //await Task.WhenAll([.. pendingBufferCopies]);
+                while (pendingBufferCopies.TryDequeue(out var t))
+                    await Safe(t);
+
                 await KillProcessAsync(recorder.StreamlinkProc);
                 recorder.StreamlinkProc = null;
 
                 await KillProcessAsync(transcoder.FfmpegProc);
                 transcoder.FfmpegProc = null;
 
-                await eventSubscribe.DeleteAllSubscriptionsAsync(token, json);
+                using var subCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                _ = eventSubscribe.DeleteAllSubscriptionsAsync(token, json).WaitAsync(subCts.Token).ContinueWith(_ => { });
 
                 await Safe(() => _ws?.DisconnectAsync()!);
 
@@ -309,6 +320,7 @@ internal class Program
         if (live.Streams.Length > 0)
         {
             _log!.Information("Стрим уже идёт, начало записи (но не с начала стрима)...");
+
             IsLive = true;
             var sessionDirectory = DirectoriesManager.CreateSessionDirectory(null, config.ChannelLogin);
 
@@ -317,10 +329,6 @@ internal class Program
 
             var recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, _cts.Token, config.UserToken));
             var transcodingTask = Task.Run(() => transcoder.StartTranscoding(sessionDirectory, tgChannel, _cts.Token));
-
-            var (title, category) = await GetStreamInfoAsync(api, channelId);
-
-            await tgChannel.SendStreamOnlineMsg(title, category, _cts.Token);
 
             if (_channelUpdHandler == null)
             {
@@ -342,6 +350,11 @@ internal class Program
 
                 _ws.ChannelUpdate += _channelUpdHandler;
             }
+
+            var (title, category) = await GetStreamInfoAsync(api, channelId);
+
+            await tgChannel.SendStreamOnlineMsg(title, category, _cts.Token);
+
             return (recordingTask, transcodingTask);
         }
 

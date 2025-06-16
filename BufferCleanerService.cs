@@ -45,7 +45,7 @@ namespace TwitchStreamsRecorder
                 {
                     var info = new DirectoryInfo(bufDir);
 
-                    var age = DateTime.Now - info.CreationTime;
+                    var age = DateTime.Now - info.LastWriteTimeUtc;
                     if (age < _retention) continue;
 
                     try
