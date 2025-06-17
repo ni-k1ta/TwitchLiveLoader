@@ -137,7 +137,7 @@ namespace TwitchStreamsRecorder
             {
                 try
                 {
-                    await using var streamPreview = File.OpenRead("C:\\Users\\sosit\\Videos\\newStreamPreview_720p.mp4");
+                    await using var streamPreview = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "newStreamPreview_720p.mp4"));
 
                     var inputStreamPreview = new InputFileStream(streamPreview, "preview.mp4");
 
@@ -310,7 +310,7 @@ namespace TwitchStreamsRecorder
 
                     _log.Information("Редактирование сообщения о начале стрима с информацией о завершении стрима прошло успешно.");
 
-                    _streamOnlineMsgId = -1;
+                    //_streamOnlineMsgId = -1;
 
                     break;
                 }

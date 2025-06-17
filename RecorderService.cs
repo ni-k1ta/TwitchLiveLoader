@@ -16,6 +16,8 @@ namespace TwitchStreamsRecorder
 
         private readonly ILogger _log;
 
+        DiskSpaceGuard? _diskGuard = null;
+
         public RecorderService(ConcurrentQueue<Task> pendingBufferCopies, ILogger log)
         {
             _pendingBufferCopies = pendingBufferCopies;
@@ -29,17 +31,19 @@ namespace TwitchStreamsRecorder
 
             return bufferFile;
         }
-        public async Task StartRecording(string twitchChannelLink, string pathForRecordBuffer, CancellationToken cts, string OAuthToken)
+        public async Task StartRecording(string twitchChannelLink, string pathForRecordBuffer, TelegramChannelService tgChannel, string OAuthToken, CancellationToken cts)
         {
             if (_bufferFilesQueue is null)
                 throw new InvalidOperationException($"[{DateTime.Now:HH:mm:ss}] Buffer queue is not set. Call SetBufferQueue() first.");
-
 
             if (StreamlinkProc is { HasExited: false }) return;
 
             var bufferDir = DirectoriesManager.CreateRecordBufferDirectory(pathForRecordBuffer);
 
             int i = 0;
+
+            _diskGuard = new(AppContext.BaseDirectory, _log);
+            _ = _diskGuard.RunAsync();
 
             while (!cts.IsCancellationRequested && Program.IsLive)
             {
@@ -51,7 +55,6 @@ namespace TwitchStreamsRecorder
                 }
 
                 var bufferFile = PrepareToRecording(bufferDir);
-
 
                 _log.Information("Запуск Streamlink...");
 
@@ -106,6 +109,9 @@ namespace TwitchStreamsRecorder
                 if (StreamlinkProc.ExitCode == 0 || StreamlinkProc.ExitCode == 1)
                 {
                     _log.Information("Streamlink закончил работу - Стрим завершён - Запись остановлена");
+
+                    await tgChannel.FinalizeStreamOnlineMsg(cts);
+
                     break;
                 }
 
@@ -124,6 +130,8 @@ namespace TwitchStreamsRecorder
             {
                 _bufferFilesQueue!.CompleteAdding(); 
             }
+
+            _diskGuard?.Dispose();
 
             StreamlinkProc?.Dispose();
             StreamlinkProc = null;

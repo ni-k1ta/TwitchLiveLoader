@@ -37,6 +37,12 @@ namespace TwitchStreamsRecorder
             string resultDir = DirectoriesManager.CreateTranscodeResultDirectory(pathForOutputResult);
 
             var firstFile = _bufferFilesQueue.Take(cts);
+
+            while (!File.Exists(firstFile))
+            {
+                await Task.Delay(50, cts);
+            }
+
             currentBufferFile = firstFile;
 
             int i = 0;
@@ -76,7 +82,7 @@ namespace TwitchStreamsRecorder
                 ffmpegPsi.ArgumentList.Add("-global_quality"); ffmpegPsi.ArgumentList.Add("20");
                 ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
                 ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
-                ffmpegPsi.ArgumentList.Add("-segment_time"); ffmpegPsi.ArgumentList.Add("1200");
+                ffmpegPsi.ArgumentList.Add("-segment_time"); ffmpegPsi.ArgumentList.Add("3600");
                 ffmpegPsi.ArgumentList.Add("-reset_timestamps"); ffmpegPsi.ArgumentList.Add("1");
                 ffmpegPsi.ArgumentList.Add("-segment_format"); ffmpegPsi.ArgumentList.Add("mp4");
                 ffmpegPsi.ArgumentList.Add("-strftime"); ffmpegPsi.ArgumentList.Add("1");
@@ -86,30 +92,19 @@ namespace TwitchStreamsRecorder
                 //ffmpegPsi.ArgumentList.Add("-y");
                 ////ffmpegPsi.ArgumentList.Add("-threads");
                 ////ffmpegPsi.ArgumentList.Add("4");
-                //ffmpegPsi.ArgumentList.Add("-i");
-                //ffmpegPsi.ArgumentList.Add("pipe:0");
-                //ffmpegPsi.ArgumentList.Add("-c:v");
-                //ffmpegPsi.ArgumentList.Add("libx264");
-                //ffmpegPsi.ArgumentList.Add("-preset");
-                //ffmpegPsi.ArgumentList.Add("fast");
-                //ffmpegPsi.ArgumentList.Add("-crf");
-                //ffmpegPsi.ArgumentList.Add("22");
-                //ffmpegPsi.ArgumentList.Add("-c:a");
-                //ffmpegPsi.ArgumentList.Add("aac");
-                //ffmpegPsi.ArgumentList.Add("-b:a");
-                //ffmpegPsi.ArgumentList.Add("128k");
-                //ffmpegPsi.ArgumentList.Add("-f");
-                //ffmpegPsi.ArgumentList.Add("segment");
-                //ffmpegPsi.ArgumentList.Add("-segment_time");
-                //ffmpegPsi.ArgumentList.Add("3600");
-                //ffmpegPsi.ArgumentList.Add("-reset_timestamps");
-                //ffmpegPsi.ArgumentList.Add("1");
-                //ffmpegPsi.ArgumentList.Add("-segment_format");
-                //ffmpegPsi.ArgumentList.Add("mp4");
-                //ffmpegPsi.ArgumentList.Add("-strftime");
-                //ffmpegPsi.ArgumentList.Add("1");
-                //ffmpegPsi.ArgumentList.Add("-movflags");
-                //ffmpegPsi.ArgumentList.Add("+faststart");
+                //ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
+                //ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
+                //ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("medium");
+                //ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("22");
+                ////ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("aac");
+                ////ffmpegPsi.ArgumentList.Add("-b:a"); ffmpegPsi.ArgumentList.Add("128k");
+                //ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
+                //ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
+                //ffmpegPsi.ArgumentList.Add("-segment_time"); ffmpegPsi.ArgumentList.Add("3600");
+                //ffmpegPsi.ArgumentList.Add("-reset_timestamps"); ffmpegPsi.ArgumentList.Add("1");
+                //ffmpegPsi.ArgumentList.Add("-segment_format"); ffmpegPsi.ArgumentList.Add("mp4");
+                //ffmpegPsi.ArgumentList.Add("-strftime"); ffmpegPsi.ArgumentList.Add("1");
+                //ffmpegPsi.ArgumentList.Add("-movflags"); ffmpegPsi.ArgumentList.Add("+faststart");
                 //ffmpegPsi.ArgumentList.Add(outFile);
 
                 try
@@ -133,7 +128,7 @@ namespace TwitchStreamsRecorder
                 var writer = FfmpegProc.StandardInput;
                 var stdin = writer.BaseStream;
 
-                FfmpegProc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.Error.WriteLine(e.Data); };
+                FfmpegProc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.WriteLine(e.Data); };
                 FfmpegProc.BeginErrorReadLine();
 
                 try
@@ -299,7 +294,7 @@ namespace TwitchStreamsRecorder
             }
             catch (Exception ex)
             {
-                _log.Error(ex, "Исключение при попытке переименовать директорию с результатами перекодирования. Обработанные файлв не будут загружены в телеграм. Требуется ручное вмешательство. Ошибка:");
+                _log.Error(ex, "Исключение при попытке переименовать директорию с результатами перекодирования. Обработанные файлы не будут загружены в телеграм. Требуется ручное вмешательство. Ошибка:");
                 dst = null;
             }
 

@@ -152,7 +152,7 @@ internal class Program
             recorder.SetBufferQueue(bufferFilesQueue, bufferSize);
             transcoder.SetBufferQueue(bufferFilesQueue, bufferSize);
 
-            recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, _cts.Token, config.UserToken));
+            recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, tgChannel, config.UserToken, _cts.Token));
             transcodingTask = Task.Run(() => transcoder.StartTranscoding(sessionDirectory, tgChannel, _cts.Token));
 
             if (_channelUpdHandler == null)
@@ -200,7 +200,7 @@ internal class Program
             _ws.ChannelUpdate -= _channelUpdHandler;
             _channelUpdHandler = null;
 
-            await tgChannel.FinalizeStreamOnlineMsg(_cts.Token);
+            //await tgChannel.FinalizeStreamOnlineMsg(_cts.Token);
         };
 
         await _ws.ConnectAsync();
@@ -212,14 +212,14 @@ internal class Program
 
         var bufferCleaner = new BufferCleanerService(
                  root: AppContext.BaseDirectory,
-                 retention: TimeSpan.FromDays(7),
+                 retention: TimeSpan.FromDays(5),
                  logger: _log,
                  stop: _cts.Token);
         _ = bufferCleaner.RunAsync();
 
         var resultCleaner = new ResultCleanerService(
                  root: AppContext.BaseDirectory,
-                 retention: TimeSpan.FromDays(15),
+                 retention: TimeSpan.FromDays(14),
                  logger: _log,
                  stop: _cts.Token);
         _ = resultCleaner.RunAsync();
@@ -327,7 +327,7 @@ internal class Program
             recorder.SetBufferQueue(bufferFilesQueue, bufferSize);
             transcoder.SetBufferQueue(bufferFilesQueue, bufferSize);
 
-            var recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, _cts.Token, config.UserToken));
+            var recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, tgChannel, config.UserToken, _cts.Token));
             var transcodingTask = Task.Run(() => transcoder.StartTranscoding(sessionDirectory, tgChannel, _cts.Token));
 
             if (_channelUpdHandler == null)
