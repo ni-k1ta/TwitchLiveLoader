@@ -69,10 +69,8 @@ namespace TwitchStreamsRecorder
 
                 streamlinkPsi.ArgumentList.Add("--stdout");
                 streamlinkPsi.ArgumentList.Add("--twitch-disable-ads");
-                streamlinkPsi.ArgumentList.Add("--twitch-api-header");
-                streamlinkPsi.ArgumentList.Add($"Authorization=Bearer {OAuthToken}");
-                streamlinkPsi.ArgumentList.Add(twitchChannelLink);
-                streamlinkPsi.ArgumentList.Add("best");
+                streamlinkPsi.ArgumentList.Add("--twitch-api-header"); streamlinkPsi.ArgumentList.Add($"Authorization=Bearer {OAuthToken}");
+                streamlinkPsi.ArgumentList.Add(twitchChannelLink); streamlinkPsi.ArgumentList.Add("best");
 
                 try
                 {

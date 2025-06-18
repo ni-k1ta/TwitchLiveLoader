@@ -46,9 +46,17 @@ namespace TwitchStreamsRecorder
 
             _log.Warning($"Свободного места на диске ({free} bytes) меньше чем установленный минимум ({_minFreeBytes} bytes) -> запуск удаления старых буффер-директорий…");
 
+            DateTime border = DateTime.Today.AddDays(-3);
+
             foreach (var dir in EnumerateBufferDirs().OrderBy(d => d.LastWriteTimeUtc))
             {
                 if (free >= _minFreeBytes) break;
+
+                if (dir.CreationTime >= border)
+                {
+                    _log.Warning($"Лайв монииторинг свободного места на диске при сканировании подходящих для удаления буффер-директорий дошёл до директорий, которые были созданы посзже чем {border} -> на диске недостаточно свободного места.");
+                    continue;
+                }
 
                 try
                 {
