@@ -123,7 +123,7 @@ internal class Program
         };
         _ws.WebsocketReconnected += (_, __) =>
         {
-            _log.Information("WebSocket reconnected — re‑subscribing (подписки будут пересозданы, т.к. прежний ID WebSocket'а более невалидный)…");
+            _log.Information("WebSocket reconnected — re‑subscribing (подписки будут пересозданы, т.к. прежний ID WebSocket'а более невалидный)...");
             return Task.CompletedTask;
         };
 

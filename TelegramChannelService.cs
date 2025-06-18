@@ -353,22 +353,25 @@ namespace TwitchStreamsRecorder
 
                 try
                 {
-                    foreach (var path in vodFiles.Skip(offset).Take(BatchSize))
+                    foreach (var file in vodFiles.Skip(offset).Take(BatchSize))
                     {
-                        var thumb = Path.ChangeExtension(path, ".jpg");
+                        if (file.Contains("temp"))
+                            continue;
+
+                        var thumb = Path.ChangeExtension(file, ".jpg");
                         if (!File.Exists(thumb))
-                            RunFFmpeg($"-ss 2 -i \"{path}\" -frames:v 1 -vf scale=320:-1 \"{thumb}\"");
+                            CreateThumbnailForVideoFragment($"-ss 2 -i \"{file}\" -frames:v 1 -vf scale=320:-1 \"{thumb}\"");
 
                         // -- (в) получаем длительность ---------------------------------------------------
-                        var duration = GetDurationSeconds(path);     // ffprobe или TagLib#
+                        var duration = GetDurationSeconds(file);     // ffprobe или TagLib#
 
-                        var fs = File.OpenRead(path);
+                        var fs = File.OpenRead(file);
                         var thumbStream = File.OpenRead(thumb);
 
                         openedStreams.Add(fs);
                         openedStreams.Add(thumbStream);
 
-                        media.Add(new InputMediaVideo(new InputFileStream(fs, Path.GetFileName(path)))
+                        media.Add(new InputMediaVideo(new InputFileStream(fs, Path.GetFileName(file)))
                         {
                             Width = 1920,
                             Height = 1080,
@@ -485,7 +488,7 @@ namespace TwitchStreamsRecorder
             _streamInfo.Titles.Clear();
             _streamInfo.Categories.Clear();
         }
-        static void RunFFmpeg(string args)
+        static void CreateThumbnailForVideoFragment(string args)
         {
             var p = Process.Start(new ProcessStartInfo("ffmpeg", "-y -loglevel error " + args)
             { RedirectStandardError = true });
