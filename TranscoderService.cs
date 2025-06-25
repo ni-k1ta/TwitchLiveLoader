@@ -73,14 +73,38 @@ namespace TwitchStreamsRecorder
                     CreateNoWindow = true
                 };
 
+
                 ffmpegPsi.ArgumentList.Add("-y");
-                ffmpegPsi.ArgumentList.Add("-hwaccel"); ffmpegPsi.ArgumentList.Add("qsv");
-                ffmpegPsi.ArgumentList.Add("-hwaccel_output_format"); ffmpegPsi.ArgumentList.Add("qsv");
-                ffmpegPsi.ArgumentList.Add("-extra_hw_frames"); ffmpegPsi.ArgumentList.Add("64");
-                ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
-                ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("hevc_qsv");
-                ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("1");
-                ffmpegPsi.ArgumentList.Add("-global_quality"); ffmpegPsi.ArgumentList.Add("20");
+                if (OperatingSystem.IsWindows())
+                {
+                    ffmpegPsi.ArgumentList.Add("-hwaccel"); ffmpegPsi.ArgumentList.Add("qsv");
+                    ffmpegPsi.ArgumentList.Add("-hwaccel_output_format"); ffmpegPsi.ArgumentList.Add("qsv");
+                    ffmpegPsi.ArgumentList.Add("-extra_hw_frames"); ffmpegPsi.ArgumentList.Add("64");
+                    ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
+                    ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("hevc_qsv");
+                    ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("1");
+                    ffmpegPsi.ArgumentList.Add("-global_quality"); ffmpegPsi.ArgumentList.Add("20");
+                }
+                else
+                {
+                    //ffmpegPsi.ArgumentList.Add("-y");
+                    //ffmpegPsi.ArgumentList.Add("-threads");
+                    //ffmpegPsi.ArgumentList.Add("4");
+                    ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
+                    ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
+                    ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("medium");
+                    ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("22");
+                    //ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("aac");
+                    //ffmpegPsi.ArgumentList.Add("-b:a"); ffmpegPsi.ArgumentList.Add("128k");
+                    //ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
+                    //ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
+                    //ffmpegPsi.ArgumentList.Add("-segment_time"); ffmpegPsi.ArgumentList.Add("3600");
+                    //ffmpegPsi.ArgumentList.Add("-reset_timestamps"); ffmpegPsi.ArgumentList.Add("1");
+                    //ffmpegPsi.ArgumentList.Add("-segment_format"); ffmpegPsi.ArgumentList.Add("mp4");
+                    //ffmpegPsi.ArgumentList.Add("-strftime"); ffmpegPsi.ArgumentList.Add("1");
+                    ////ffmpegPsi.ArgumentList.Add("-movflags"); ffmpegPsi.ArgumentList.Add("+faststart");
+                    //ffmpegPsi.ArgumentList.Add(outFile);
+                }
                 ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
                 ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
                 ffmpegPsi.ArgumentList.Add("-segment_time"); ffmpegPsi.ArgumentList.Add("3600");
@@ -89,33 +113,16 @@ namespace TwitchStreamsRecorder
                 ffmpegPsi.ArgumentList.Add("-strftime"); ffmpegPsi.ArgumentList.Add("1");
                 ffmpegPsi.ArgumentList.Add(outFile);
 
-                //ffmpegPsi.ArgumentList.Add("-y");
-                ////ffmpegPsi.ArgumentList.Add("-threads");
-                ////ffmpegPsi.ArgumentList.Add("4");
-                //ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
-                //ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
-                //ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("medium");
-                //ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("22");
-                ////ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("aac");
-                ////ffmpegPsi.ArgumentList.Add("-b:a"); ffmpegPsi.ArgumentList.Add("128k");
-                //ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
-                //ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
-                //ffmpegPsi.ArgumentList.Add("-segment_time"); ffmpegPsi.ArgumentList.Add("3600");
-                //ffmpegPsi.ArgumentList.Add("-reset_timestamps"); ffmpegPsi.ArgumentList.Add("1");
-                //ffmpegPsi.ArgumentList.Add("-segment_format"); ffmpegPsi.ArgumentList.Add("mp4");
-                //ffmpegPsi.ArgumentList.Add("-strftime"); ffmpegPsi.ArgumentList.Add("1");
-                ////ffmpegPsi.ArgumentList.Add("-movflags"); ffmpegPsi.ArgumentList.Add("+faststart");
-                //ffmpegPsi.ArgumentList.Add(outFile);
 
                 try
-                {
-                    FfmpegProc = Process.Start(ffmpegPsi);
-                }
-                catch (Exception ex)
-                {
-                    _log.Fatal(ex, "Запуск ffmpeg не удался. Ошибка:");
-                    return;
-                }
+                    {
+                        FfmpegProc = Process.Start(ffmpegPsi);
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.Fatal(ex, "Запуск ffmpeg не удался. Ошибка:");
+                        return;
+                    }
 
                 if (FfmpegProc is null)
                 {

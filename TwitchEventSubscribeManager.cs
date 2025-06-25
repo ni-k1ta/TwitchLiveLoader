@@ -74,7 +74,7 @@ namespace TwitchStreamsRecorder
                         _log.Warning(ex, $"BadScopeException 401 ⇒ попытка ({i}) обновления токена не увенчалась успехом. Повтор через {delayMs}с. Ошибка:");
                     }
 
-                    delayMs = (int)Math.Min(Math.Round(delayMs * 1.5), maxDelayMs);
+                    delayMs = (int)Math.Min(Math.Round(delayMs * 1.5, 0), maxDelayMs);
 
                     await Task.Delay(delayMs);
                     await token.RefreshAccessTokenAsync(true, () => cfgSvc.SaveConfig(_cfg, ConfigService.GetDefaultConfigPath()));
@@ -106,7 +106,7 @@ namespace TwitchStreamsRecorder
                         _log.Warning(ex, $"Внутренняя ошибка сервера. Попытка ({i}) запроса не увенчалась успехом. Повтор через {delayMs}с. Ошибка:");
                     }
 
-                    delayMs = (int)Math.Min(Math.Round(delayMs * 1.5), maxDelayMs);
+                    delayMs = (int)Math.Min(Math.Round(delayMs * 1.5, 0), maxDelayMs);
 
                     await Task.Delay(delayMs);
                 }
@@ -123,7 +123,7 @@ namespace TwitchStreamsRecorder
                         _log.Warning(ex, $"Ошибка сети. Попытка ({i}) запроса не увенчалась успехом. Повтор через {delayMs}с. Ошибка:");
                     }
 
-                    delayMs = (int)Math.Min(Math.Round(delayMs * 1.5), maxDelayMs);
+                    delayMs = (int)Math.Min(Math.Round(delayMs * 1.5, 0), maxDelayMs);
 
                     await Task.Delay(delayMs);
                 }
@@ -223,7 +223,7 @@ namespace TwitchStreamsRecorder
 
                 await Task.Delay(delayMs);
 
-                delayMs = (int)Math.Min(Math.Round(delayMs * 1.5), maxDelayMs);
+                delayMs = (int)Math.Min(Math.Round(delayMs * 1.5, 0), maxDelayMs);
             }
 
             _log.Information("Соединение восстановлено.");

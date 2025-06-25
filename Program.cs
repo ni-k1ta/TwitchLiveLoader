@@ -144,7 +144,7 @@ internal class Program
 
         _ws.StreamOnline += async (_, e) =>
         {
-            _log.Information("Стрим запущен, начало запсиси...");
+            _log.Information("Стрим запущен, начало записи...");
             IsLive = true;
 
             var sessionDirectory = DirectoriesManager.CreateSessionDirectory(null, config.ChannelLogin);
