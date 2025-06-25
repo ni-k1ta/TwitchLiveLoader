@@ -69,8 +69,16 @@ namespace TwitchStreamsRecorder
 
                 streamlinkPsi.ArgumentList.Add("--stdout");
                 streamlinkPsi.ArgumentList.Add("--twitch-disable-ads");
+                streamlinkPsi.ArgumentList.Add("--retry-streams"); streamlinkPsi.ArgumentList.Add("3");
+                streamlinkPsi.ArgumentList.Add("--retry-max"); streamlinkPsi.ArgumentList.Add("3");
+                streamlinkPsi.ArgumentList.Add("--retry-open"); streamlinkPsi.ArgumentList.Add("10");
+                streamlinkPsi.ArgumentList.Add("--stream-segment-attempts"); streamlinkPsi.ArgumentList.Add("10");
+                streamlinkPsi.ArgumentList.Add("--stream-segment-threads"); streamlinkPsi.ArgumentList.Add("2");
+                streamlinkPsi.ArgumentList.Add("--stream-timeout"); streamlinkPsi.ArgumentList.Add("180");
+                streamlinkPsi.ArgumentList.Add("--hls-playlist-reload-attempts"); streamlinkPsi.ArgumentList.Add("10");
+                streamlinkPsi.ArgumentList.Add("--default-stream"); streamlinkPsi.ArgumentList.Add("1080p,best,720p");
                 streamlinkPsi.ArgumentList.Add("--twitch-api-header"); streamlinkPsi.ArgumentList.Add($"Authorization=Bearer {OAuthToken}");
-                streamlinkPsi.ArgumentList.Add(twitchChannelLink); streamlinkPsi.ArgumentList.Add("best");
+                streamlinkPsi.ArgumentList.Add(twitchChannelLink);
 
                 try
                 {

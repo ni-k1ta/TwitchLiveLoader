@@ -233,7 +233,7 @@ internal class Program
         Console.CancelKeyPress += (_, e) =>
         {
             e.Cancel = true;
-            Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder, eventSubscribe, token, json);
+            Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder, eventSubscribe, token, json, tgChannel);
         };
         //AppDomain.CurrentDomain.ProcessExit += (_, __) =>
         //{
@@ -244,7 +244,7 @@ internal class Program
         _shutdownDone.Wait();
     }
 
-    private static void Shutdown(BlockingCollection<string> bufferFilesQueue, ConcurrentQueue<Task> pendingBufferCopies, Task? recordingTask, Task transcodingTask, RecorderService recorder, TranscoderService transcoder, TwitchEventSubscribeManager eventSubscribe, TokenRefresher token, ConfigService json)
+    private static void Shutdown(BlockingCollection<string> bufferFilesQueue, ConcurrentQueue<Task> pendingBufferCopies, Task? recordingTask, Task transcodingTask, RecorderService recorder, TranscoderService transcoder, TwitchEventSubscribeManager eventSubscribe, TokenRefresher token, ConfigService json, TelegramChannelService telegram)
     {
         if (Interlocked.Exchange(ref _shutdownStarted, 1) != 0)
             return;
@@ -273,6 +273,8 @@ internal class Program
                 _ = eventSubscribe.DeleteAllSubscriptionsAsync(token, json).WaitAsync(subCts.Token).ContinueWith(_ => { });
 
                 await Safe(() => _ws?.DisconnectAsync()!);
+
+                await telegram.DisposeAsync();
 
                 _log!.Information("Shutdown finished.");
             }
