@@ -22,6 +22,7 @@ namespace TwitchStreamsRecorder
 
         private readonly StreamInfo _streamInfo;
         private readonly string _tgChannelId;
+        private readonly string _tgChannelChatId = "@cuuterina_vods_chat";
         private readonly TelegramBotClient _tgBot;
         private int _streamOnlineMsgId = -1;
 
@@ -414,19 +415,44 @@ namespace TwitchStreamsRecorder
                     _log.Information($"Начало загрузки перекодированных фрагментов (1080p) стрима в телеграм канал {_tgChannelId}...");
 
                     var msg1080 = await Retry(async () => await _bot.SendMediaGroup(_tgChannelId, media), cts);
-                    
-                    if (firstPack)
-                    {
-                        firstPack = false;
-                        var first1080 = msg1080.FirstOrDefault();
-                        
-                        if (first1080 != null)
-                        {
-                            _1080msgId = first1080.MessageId;
-                        }
-                    }
 
                     _log.Information($"Фрагменты перекодированной трансляции (1080p) ({media.Count} из {vodFiles.Length}) загружены успешно.");
+
+                    var first1080 = msg1080.FirstOrDefault();
+                    if (first1080 != null)
+                    {
+                        if (firstPack)
+                        {
+                            firstPack = false;
+                            _1080msgId = first1080.MessageId;
+                        }
+
+                        _log.Information($"При отправке сообщения в канал {_tgChannelId} (в данной ситуации речь идёт о сообщении с фрагментами перекодированной трансляции в 1080p), оно автоматически отправляется в привязанный чат {_tgChannelChatId} и закрепляется в нём. Сейчас это сообщение будет найдено и откреплено, чтобы в закреплённых в чате оставались только заглавные сообщения (фрагментов записи в 720p, которые будут загружаться позже, это не касается, т.к. они загружаются сразу в чат, а не в канал).");
+                        await Task.Delay(TimeSpan.FromSeconds(3), cts);
+                        var chat = await _bot.GetChat(_tgChannelChatId);
+                        var message = chat.PinnedMessage;
+
+                        _log.Information("Попытка открепеления найденного последнего закреплённого сообщения.");
+                        if (message != null)
+                        {
+                            while(!string.IsNullOrEmpty(message!.Text))
+                            {
+                                await Task.Delay(TimeSpan.FromSeconds(3), cts);
+                                chat = await _bot.GetChat(_tgChannelChatId);
+                                message = chat.PinnedMessage;
+                            }
+
+                            await _bot.PinUnpinChatMessage(_tgChannelChatId, message.MessageId, false, true);
+                            _log.Information($"Сообщение с фрагментами записи в 1080p успешно откреплено в чате {_tgChannelChatId}.");
+                        }
+                        else
+                        {
+                            _log.Warning("Не было найдено закреплённое сообщение.");
+                        }
+
+                        chat = null;
+                        message = null;
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -579,7 +605,7 @@ namespace TwitchStreamsRecorder
 
                     var msg720 = await Retry(async () => await _bot.SendMediaGroup
                         (
-                            "@cuuterina_vods_chat",
+                            _tgChannelChatId,
                             media,
                             disableNotification: true
                         ), cts);
@@ -590,9 +616,7 @@ namespace TwitchStreamsRecorder
                         var first720 = msg720.FirstOrDefault();
 
                         if (first720 != null)
-                        {
                             _720msgId = first720.MessageId;
-                        }
                     }
 
                     _log.Information($"Фрагменты перекодированной трансляции (720p) ({media.Count} из {vodFiles.Length}) загружены успешно.");
