@@ -117,8 +117,7 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAACiAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-01T00:36:00.985Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
@@ -170,8 +169,7 @@
               "ViewState": "AgIAABcBAAAAAAAAAAAmwCcBAAAZAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-01T00:32:09.557Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
@@ -181,7 +179,7 @@
               "RelativeDocumentMoniker": "TelegramChannelService.cs",
               "ToolTip": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\TelegramChannelService.cs",
               "RelativeToolTip": "TelegramChannelService.cs",
-              "ViewState": "AgIAAHsCAAAAAAAAAAAswIgCAAA2AAAAAAAAAA==",
+              "ViewState": "AgIAAC0CAAAAAAAAAAAswEoCAAAiAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-12T19:22:03.483Z",
               "IsPinned": true,
@@ -224,8 +222,7 @@
               "ViewState": "AgIAAH0AAAAAAAAAAAArwIYAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-12T19:36:56.015Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Bookmark",
@@ -241,8 +238,7 @@
               "RelativeToolTip": "Result720CleanerService.cs",
               "ViewState": "AgIAACMAAAAAAAAAAAAwwDMAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-26T06:12:44.812Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-26T06:12:44.812Z"
             },
             {
               "$type": "Document",
@@ -278,8 +274,7 @@
               "RelativeToolTip": "ResultCleanerService.cs",
               "ViewState": "AgIAAAgAAAAAAAAAAAAQwDkAAAAVAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-14T00:22:27.197Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-14T00:22:27.197Z"
             },
             {
               "$type": "Document",
@@ -291,8 +286,7 @@
               "RelativeToolTip": "BufferCleanerService.cs",
               "ViewState": "AgIAABcAAAAAAAAAAAAwwCsAAABQAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-14T00:05:13.616Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-14T00:05:13.616Z"
             },
             {
               "$type": "Document",

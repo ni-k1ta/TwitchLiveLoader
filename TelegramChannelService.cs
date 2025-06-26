@@ -579,7 +579,7 @@ namespace TwitchStreamsRecorder
 
                     var msg720 = await Retry(async () => await _bot.SendMediaGroup
                         (
-                            "@test_twitchVODs_loader_chat",
+                            "@cuuterina_vods_chat",
                             media,
                             disableNotification: true
                         ), cts);
