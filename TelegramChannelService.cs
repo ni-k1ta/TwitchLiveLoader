@@ -92,9 +92,9 @@ namespace TwitchStreamsRecorder
                 Add(MessageEntityType.Italic, $"({_streamInfo.Date:dd.MM.yyyy})");
                 Add(MessageEntityType.Blockquote, $"1080p/720p ({_streamInfo.Date:dd.MM.yyyy})");
                 if (msg1080Id != -1)
-                    Add(MessageEntityType.TextLink, "1080p", $"https://t.me/test_twitchVODs_loader_bot/{msg1080Id}");
+                    Add(MessageEntityType.TextLink, "1080p", $"https://t.me/cuuterina_vods/{msg1080Id}");
                 if (msg720Id != -1)
-                    Add(MessageEntityType.TextLink, "720p", $"https://t.me/test_twitchVODs_loader_chat/{msg720Id}");
+                    Add(MessageEntityType.TextLink, "720p", $"https://t.me/cuuterina_vods_chat/{msg720Id}");
                 Add(MessageEntityType.TextLink, "Twitch", "https://www.twitch.tv/cuuterina");
                 Add(MessageEntityType.TextLink, "TG", "https://t.me/cuuterina");
                 Add(MessageEntityType.TextLink, "Inst", "http://www.instagram.com/cuuterina");
