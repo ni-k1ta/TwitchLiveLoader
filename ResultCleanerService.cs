@@ -19,7 +19,7 @@ namespace TwitchStreamsRecorder
 
         private async Task LoopAsync()
         {
-            _log.Debug("Запуск мониторинга директорий с обработанными результатами.");
+            _log.Debug("Запуск мониторинга директорий с обработанными результатами в 1080p.");
 
             var timer = new PeriodicTimer(TimeSpan.FromHours(24) + TimeSpan.FromSeconds(10));
 
@@ -28,7 +28,7 @@ namespace TwitchStreamsRecorder
                 try { CleanOnce(); }
                 catch (Exception ex)
                 {
-                    _log.Warning(ex, "Неожиданное исключение при попытке удалить директории с обработанными результатами. Ошибка:");
+                    _log.Warning(ex, "Неожиданное исключение при попытке удалить директории с обработанными результатамив 1080p. Ошибка:");
                 }
             }
         }
@@ -37,13 +37,13 @@ namespace TwitchStreamsRecorder
         {
             int removed = 0;
 
-            _log.Information("Начало сканирования директорий с обработанными результатами...");
+            _log.Information("Начало сканирования директорий с обработанными результатами в 1080p...");
 
             foreach (var sessionDir in Directory.EnumerateDirectories(_root, "*_*", SearchOption.TopDirectoryOnly))
             {
-                foreach (var bufDir in Directory.EnumerateDirectories(sessionDir, "result_*", SearchOption.TopDirectoryOnly))
+                foreach (var resDir in Directory.EnumerateDirectories(sessionDir, "result_*", SearchOption.TopDirectoryOnly))
                 {
-                    var info = new DirectoryInfo(bufDir);
+                    var info = new DirectoryInfo(resDir);
 
                     var age = DateTime.Now - info.LastWriteTimeUtc;
                     if (age < _retention) continue;
@@ -52,19 +52,19 @@ namespace TwitchStreamsRecorder
                     {
                         info.Delete(recursive: true);
                         removed++;
-                        _log.Information($"Удалена директория с обработанными результатами {info.FullName} по причине истчения срока хранения.");
+                        _log.Information($"Удалена директория с обработанными результатами в 1080p {info.FullName} по причине истчения срока хранения.");
                     }
                     catch (IOException io)
                     {
-                        _log.Warning(io, $"Исключение при попытке удалить директорию с обработанными результатами {info.FullName}. Ошибка:");
+                        _log.Warning(io, $"Исключение при попытке удалить директорию с обработанными результатами в 1080p {info.FullName}. Ошибка:");
                     }
                 }
             }
 
             if (removed > 0)
-                _log.Information($"Сканирование директорий с обработанными результатами завершено. Удалено {removed} директорий.");
+                _log.Information($"Сканирование директорий с обработанными результатами в 1080p завершено. Удалено {removed} директорий.");
             else
-                _log.Information("Сканирование директорий с обработанными результатами завершено. Не найдено директорий с истёкшым сроком хранения.");
+                _log.Information("Сканирование директорий с обработанными результатами в 1080p завершено. Не найдено директорий с истёкшым сроком хранения.");
         }
     }
 }

@@ -11,9 +11,10 @@ namespace TwitchStreamsRecorder
         private int _bufferSize;
         private BlockingCollection<string>? _bufferFilesQueue;
 
-        private Process? _ffmpegProc;
+        private Process? _ffmpegProc; private Process? _ffmpegProc720;
 
         public Process? FfmpegProc { get => _ffmpegProc; set => _ffmpegProc = value; }
+        public Process? FfmpegProc720 { get => _ffmpegProc720; set => _ffmpegProc720 = value; }
 
         private readonly ILogger _log;
 
@@ -79,6 +80,7 @@ namespace TwitchStreamsRecorder
                 {
                     ffmpegPsi.ArgumentList.Add("-hwaccel"); ffmpegPsi.ArgumentList.Add("qsv");
                     ffmpegPsi.ArgumentList.Add("-hwaccel_output_format"); ffmpegPsi.ArgumentList.Add("qsv");
+                    //ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("hevc_qsv");
                     ffmpegPsi.ArgumentList.Add("-extra_hw_frames"); ffmpegPsi.ArgumentList.Add("64");
                     ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
                     ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("hevc_qsv");
@@ -115,14 +117,14 @@ namespace TwitchStreamsRecorder
 
 
                 try
-                    {
-                        FfmpegProc = Process.Start(ffmpegPsi);
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.Fatal(ex, "Запуск ffmpeg не удался. Ошибка:");
-                        return;
-                    }
+                {
+                    FfmpegProc = Process.Start(ffmpegPsi);
+                }
+                catch (Exception ex)
+                {
+                    _log.Fatal(ex, "Запуск ffmpeg не удался. Ошибка:");
+                    return;
+                }
 
                 if (FfmpegProc is null)
                 {
@@ -130,13 +132,13 @@ namespace TwitchStreamsRecorder
                     return;
                 }
 
-                _log.Information("ffmpeg успешно запущен.");
-
                 var writer = FfmpegProc.StandardInput;
                 var stdin = writer.BaseStream;
 
                 FfmpegProc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.WriteLine(e.Data); };
                 FfmpegProc.BeginErrorReadLine();
+
+                _log.Information("ffmpeg успешно запущен.");
 
                 try
                 {
@@ -146,9 +148,9 @@ namespace TwitchStreamsRecorder
                     {
                         await FfmpegProc.WaitForExitAsync(cts);
 
-                        _log.Information("ffmpeg успешно закончил перекодирование - все буффер-файлы оработаны.");
-
                         isReadyToUpload = true;
+
+                        _log.Information("ffmpeg успешно закончил перекодирование - все буффер-файлы оработаны.");
 
                         break;
                     }
@@ -160,7 +162,7 @@ namespace TwitchStreamsRecorder
                 catch (OperationCanceledException) { }
                 catch (Exception ex)
                 {
-                    _log.Warning(ex, "Неожиданное заверешние ffmpeg - перезапуск...");
+                    _log.Warning(ex, "Неожиданное завершение ffmpeg - перезапуск...");
                 }
                 finally
                 {
@@ -201,15 +203,125 @@ namespace TwitchStreamsRecorder
 
                 if (finalDir == null) return;
 
+                _ = StartTranscoding720(finalDir, tgChannel, cts);
+
                 await tgChannel.SendFinalStreamVOD(Directory.GetFiles(finalDir, "*.mp4"), cts);
             }
+        }
+        public async Task StartTranscoding720(string pathForOutputResult, TelegramChannelService tgChannel, CancellationToken cts)
+        {
+            if (FfmpegProc720 is not null && !FfmpegProc720.HasExited)
+                return;
+
+            var parentDir = Path.GetDirectoryName(pathForOutputResult);
+            var currBuffDir = Directory.GetDirectories(parentDir!, "buffer_*").OrderByDescending(Path.GetFileName).FirstOrDefault();
+
+            string resultDir = Path.Combine(pathForOutputResult, "720p");
+            Directory.CreateDirectory(resultDir);
+
+            var filesCount = Directory.EnumerateFiles(currBuffDir!, "*.ts", SearchOption.TopDirectoryOnly).Count();
+
+            int i = 0;
+
+            foreach (var buff in Directory.EnumerateFiles(currBuffDir!, "*.ts", SearchOption.TopDirectoryOnly))
+            {
+                i++;
+
+                var outFile = Path.Combine(resultDir, "720rec_%Y-%m-%d_%H-%M-%S.mp4");
+
+                _log.Information($"Запуск ffmpeg для перкодирования в 720p для файла {buff} ({i} из {filesCount})...");
+
+                var ffmpegPsi = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    RedirectStandardInput = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+
+                ffmpegPsi.ArgumentList.Add("-y");
+                ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add($"{buff}");
+                ffmpegPsi.ArgumentList.Add("-vf"); ffmpegPsi.ArgumentList.Add("scale=-2:720");
+                ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
+                ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("medium");
+                ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("22");
+                ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
+                ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
+                ffmpegPsi.ArgumentList.Add("-segment_time"); ffmpegPsi.ArgumentList.Add("3600");
+                ffmpegPsi.ArgumentList.Add("-reset_timestamps"); ffmpegPsi.ArgumentList.Add("1");
+                ffmpegPsi.ArgumentList.Add("-segment_format"); ffmpegPsi.ArgumentList.Add("mp4");
+                ffmpegPsi.ArgumentList.Add("-strftime"); ffmpegPsi.ArgumentList.Add("1");
+                ffmpegPsi.ArgumentList.Add("-movflags"); ffmpegPsi.ArgumentList.Add("+faststart");
+                ffmpegPsi.ArgumentList.Add(outFile);
+
+                try
+                {
+                        FfmpegProc720 = Process.Start(ffmpegPsi);
+                }
+                catch (Exception ex)
+                {
+                    _log.Fatal(ex, $"Запуск ffmpeg для перекодирования в 720p для файла {buff} не удался. Ошибка:");
+                    return;
+                }
+                
+                if (FfmpegProc720 is null)
+                {
+                    _log.Fatal($"Запуск ffmpeg для перекодирования в 720p для файла {buff} не удался.");
+                    return;
+                }
+                
+                FfmpegProc720!.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.WriteLine(e.Data); };
+                FfmpegProc720.BeginErrorReadLine();
+                
+                _log.Information($"ffmpeg для перекодирования в 720p для файла {buff} успешно запущен.");
+                
+                try
+                {
+                    await FfmpegProc720.WaitForExitAsync(cts);
+                }
+                catch (Exception ex)
+                {
+                    _log.Error(ex, $"Неожиданное завершение ffmpeg при попытке перекодирования файла {buff} в 720p. Оставшиеся файлы также не будет перекодированы -> никакие фрагменты в 720p не будут загружены в телеграм чат канала. Требуется ручное вмешательство. Файлы, которые были успешно перекодированы, будут удалены через 5 часов. Ошибка:");
+                
+                    return;
+                }
+                finally
+                {
+                    if (FfmpegProc720 != null)
+                    {
+                        if (!FfmpegProc720!.HasExited)
+                        {
+                            try
+                            {
+                                using var to = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                                await FfmpegProc720.WaitForExitAsync(to.Token);
+                            }
+                            catch (OperationCanceledException) { }
+                
+                            if (!FfmpegProc720.HasExited)
+                                    FfmpegProc720.Kill(entireProcessTree: true);
+                        }
+
+                        _log.Warning($"ffmpeg exit code = {FfmpegProc720!.ExitCode}");
+                        FfmpegProc720.Dispose();
+                        FfmpegProc720 = null;
+                    }
+                }
+            }
+
+            await tgChannel.SendFinalStreamVOD720(Directory.GetFiles(resultDir, "*.mp4"), cts);
+
+            Directory.Delete(resultDir, true);
         }
 
         private async Task FastStartPassAsync(string dir, CancellationToken cts)
         {
             _log.Information("Запуск процесса сдвига метаданных перекодированных фрагментов для возможности потокового воспроизведения...");
 
-            Path.GetFileNameWithoutExtension(dir);
+            //Path.GetFileNameWithoutExtension(dir);
 
             foreach (var tmp in Directory.EnumerateFiles(dir, "*.temp.mp4", SearchOption.TopDirectoryOnly))
             {
@@ -340,7 +452,7 @@ namespace TwitchStreamsRecorder
 
                     if (_bufferFilesQueue!.IsAddingCompleted && bufferFileStream.Length == readPos)
                     {
-                        _log.Information($"Заверешние чтения буффер файла ({bufferFile}).");
+                        _log.Information($"Завершение чтения буффер файла ({bufferFile}).");
                         break;
                     }
 
@@ -352,16 +464,13 @@ namespace TwitchStreamsRecorder
                     if (!_bufferFilesQueue.TryTake(out bufferFile))
                         bufferFile = null;
                 }
-                else if (bufferFile is null)
-                {
-                    bufferFile = _bufferFilesQueue.Take(cts);
-                }
+                else bufferFile ??= _bufferFilesQueue.Take(cts);
 
                 readPos = 0;
             }
 
             await writer.WriteAsync("q\n".AsMemory(), cts);
-            await writer.FlushAsync();
+            await writer.FlushAsync(cts);
 
             writer.Close();
             stdIn.Close();

@@ -30,6 +30,10 @@ namespace TwitchStreamsRecorder
 
         private readonly ILogger _log;
 
+        private static readonly SemaphoreSlim _sendLocker = new(1, 1);
+        private int _1080msgId = -1;
+        private int _720msgId = -1;
+
         public TelegramChannelService(string channelId, TelegramBotClient tgBot, int apiId, string apiHash, ILogger logger)
         {
             _log = logger.ForContext("Source", "TelegramChannelService");
@@ -58,7 +62,7 @@ namespace TwitchStreamsRecorder
 
             _bot = new Bot(_tgBot.Token, apiId, apiHash, _db);
         }
-        private Telegram.Bot.Types.MessageEntity[] BuildEntities(string text, bool endMsg)
+        private Telegram.Bot.Types.MessageEntity[] BuildEntities(string text, bool endMsg, int msg1080Id = -1, int msg720Id = -1)
         {
             var list = new List<Telegram.Bot.Types.MessageEntity>();
 
@@ -86,7 +90,11 @@ namespace TwitchStreamsRecorder
                 Add(MessageEntityType.Blockquote, "will be updated (мейби) ✍");
                 Add(MessageEntityType.Code, "[таймкоды мейби будут в описаниях к записям]");
                 Add(MessageEntityType.Italic, $"({_streamInfo.Date:dd.MM.yyyy})");
-                Add(MessageEntityType.Blockquote, $"({_streamInfo.Date:dd.MM.yyyy})");
+                Add(MessageEntityType.Blockquote, $"1080p/720p ({_streamInfo.Date:dd.MM.yyyy})");
+                if (msg1080Id != -1)
+                    Add(MessageEntityType.TextLink, "1080p", $"https://t.me/test_twitchVODs_loader_bot/{msg1080Id}");
+                if (msg720Id != -1)
+                    Add(MessageEntityType.TextLink, "720p", $"https://t.me/test_twitchVODs_loader_chat/{msg720Id}");
                 Add(MessageEntityType.TextLink, "Twitch", "https://www.twitch.tv/cuuterina");
                 Add(MessageEntityType.TextLink, "TG", "https://t.me/cuuterina");
                 Add(MessageEntityType.TextLink, "Inst", "http://www.instagram.com/cuuterina");
@@ -274,7 +282,7 @@ namespace TwitchStreamsRecorder
                 return;
 
             var sb = new StringBuilder();
-            sb.AppendLine("✨New stream✨ (Запись будет в течение пары часов)");
+            sb.AppendLine("✨New stream✨ (Запись 1080p будет в течение пары часов, 720p чуть позже)");
             sb.AppendLine();
             sb.AppendLine("💬 Тайтлы");
             foreach (var t in _streamInfo.Titles) sb.AppendLine($"• {t}");
@@ -289,7 +297,7 @@ namespace TwitchStreamsRecorder
             sb.AppendLine();
             sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
             sb.AppendLine();
-            sb.AppendLine($"({_streamInfo.Date:dd.MM.yyyy})");
+            sb.AppendLine($"1080p/720p ({_streamInfo.Date:dd.MM.yyyy})");
             sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
             var msgText = sb.ToString();
 
@@ -308,7 +316,7 @@ namespace TwitchStreamsRecorder
                         cancellationToken: cts
                     );
 
-                    _log.Information("Редактирование сообщения о начале стрима с информацией о завершении стрима прошло успешно.");
+                    _log.Information("Редактирование сообщения о начале стрима перед загрузкой записей прошло успешно.");
 
                     //_streamOnlineMsgId = -1;
 
@@ -318,7 +326,7 @@ namespace TwitchStreamsRecorder
                 {
                     if (i == 10)
                     {
-                        _log.Error(ex, "Редактирование сообщения о начале стрима с информацией о завершении стрима после нескольких попыток не удалось. Требуется ручное вмешательство. Ошибка:");
+                        _log.Error(ex, "Редактирование сообщения о начале стрима перед загрузкой записей после нескольких попыток не удалось. Требуется ручное вмешательство. Ошибка:");
 
                         _streamOnlineMsgId = -1;
 
@@ -326,7 +334,7 @@ namespace TwitchStreamsRecorder
                     }
                     else
                     {
-                        _log.Warning(ex, $"Попытка ({i}) редактирования сообщения о начале стрима с информацией о завершении стрима не увенчалась успехом. Повтор через: {5 * i}c. Ошибка:");
+                        _log.Warning(ex, $"Попытка ({i}) редактирования сообщения о начале стрима перед загрузкой записей не увенчалась успехом. Повтор через: {5 * i}c. Ошибка:");
 
                         await Task.Delay(TimeSpan.FromSeconds(5 * i), cts);
 
@@ -338,18 +346,20 @@ namespace TwitchStreamsRecorder
 
         public async Task SendFinalStreamVOD(IEnumerable<string> VODsFiles, CancellationToken cts)
         {
-            await _bot.Client.LoginBotIfNeeded();              // MTProto-логин (делается 1 раз)
+            await _bot.Client.LoginBotIfNeeded();
 
             const int BatchSize = 10;
 
             var vodFiles = VODsFiles.OrderBy(Path.GetFileName).ToArray();
+
+            bool firstPack = true;
 
             for (int offset = 0; offset < vodFiles.Length; offset += BatchSize)
             {
                 var media = new List<IAlbumInputMedia>();
                 var openedStreams = new List<Stream>();
 
-                _log.Information($"Подготовка перекодированных фрагментов стрима для загрузки в телеграммм канал {_tgChannelId}...");
+                _log.Information($"Подготовка перекодированных фрагментов стрима (1080p) для загрузки в телеграм канал {_tgChannelId}...");
 
                 try
                 {
@@ -381,11 +391,11 @@ namespace TwitchStreamsRecorder
                         });
                     }
 
-                    _log.Information($"{media.Count} из {vodFiles.Length} перекодированных фрагментов стрима готовы к загрузке.");
+                    _log.Information($"{media.Count} из {vodFiles.Length} перекодированных фрагментов (1080p) стрима готовы к загрузке.");
                 }
                 catch (Exception ex)
                 {
-                    _log.Error(ex, "Не удалось подготовить список перекодированных фрагментов трансляции для загрузки. Требуется ручное вмешательство. Ошибка:");
+                    _log.Error(ex, "Не удалось подготовить список перекодированных фрагментов (1080p) трансляции для загрузки. Требуется ручное вмешательство. Ошибка:");
 
                     foreach (var s in openedStreams)
                         s.Dispose();
@@ -399,11 +409,24 @@ namespace TwitchStreamsRecorder
 
                 try
                 {
-                    _log.Information($"Начало загрузки перекодированных фрагментов стрима в телеграм канал {_tgChannelId}...");
+                    await _sendLocker.WaitAsync(cts);
 
-                    await Retry(async () => await _bot.SendMediaGroup(_tgChannelId, media), cts);
+                    _log.Information($"Начало загрузки перекодированных фрагментов (1080p) стрима в телеграм канал {_tgChannelId}...");
 
-                    _log.Information($"Фрагменты перекодированной трансляции ({media.Count} из {vodFiles.Length}) загружены успешно.");
+                    var msg1080 = await Retry(async () => await _bot.SendMediaGroup(_tgChannelId, media), cts);
+                    
+                    if (firstPack)
+                    {
+                        firstPack = false;
+                        var first1080 = msg1080.FirstOrDefault();
+                        
+                        if (first1080 != null)
+                        {
+                            _1080msgId = first1080.MessageId;
+                        }
+                    }
+
+                    _log.Information($"Фрагменты перекодированной трансляции (1080p) ({media.Count} из {vodFiles.Length}) загружены успешно.");
                 }
                 catch (OperationCanceledException)
                 {
@@ -415,6 +438,8 @@ namespace TwitchStreamsRecorder
                 }
                 finally
                 {
+                    _sendLocker.Release();
+
                     foreach (var s in openedStreams)
                         s.Dispose();
                 }
@@ -439,11 +464,11 @@ namespace TwitchStreamsRecorder
             sb.AppendLine();
             sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
             sb.AppendLine();
-            sb.AppendLine($"({_streamInfo.Date:dd.MM.yyyy})");
+            sb.AppendLine($"1080p/720p ({_streamInfo.Date:dd.MM.yyyy})");
             sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
             var msgText = sb.ToString();
 
-            var entities = BuildEntities(msgText, true);
+            var entities = BuildEntities(msgText, true, _1080msgId);
 
             for (int i = 1; i <= 10; i++)
             {
@@ -458,9 +483,9 @@ namespace TwitchStreamsRecorder
                         cancellationToken: cts
                     );
 
-                    _log.Information("Финальное редактирование сообщения о начале стрима прошло успешно.");
+                    _log.Information("Редактирование сообщения о начале стрима прошло успешно (добавлена информация о записях в 1080p).");
 
-                    _streamOnlineMsgId = -1;
+                    //_streamOnlineMsgId = -1;
 
                     break;
                 }
@@ -468,15 +493,184 @@ namespace TwitchStreamsRecorder
                 {
                     if (i == 10)
                     {
-                        _log.Error(ex, "Финальное редактирование сообщения о начале стрима после нескольких попыток не удалось. Требуется ручное вмешательство. Ошибка:");
+                        _log.Error(ex, "Pедактирование сообщения о начале стрима после нескольких попыток не удалось (информация о записях в 1080p). Требуется ручное вмешательство. Ошибка:");
 
                         _streamOnlineMsgId = -1;
+                        _streamInfo.Titles.Clear();
+                        _streamInfo.Categories.Clear();
 
                         break;
                     }
                     else
                     {
-                        _log.Warning(ex, $"Попытка ({i}) финального редактирования сообщения о начале стрима не увенчалась успехом. Повтор через: {5 * i}c. Ошибка:");
+                        _log.Warning(ex, $"Попытка ({i}) редактирования сообщения о начале стрима не увенчалась успехом (информация о записях в 1080p). Повтор через: {5 * i}c. Ошибка:");
+
+                        await Task.Delay(TimeSpan.FromSeconds(5 * i), cts);
+
+                        continue;
+                    }
+                }
+            }
+        }
+        public async Task SendFinalStreamVOD720(IEnumerable<string> VODsFiles, CancellationToken cts)
+        {
+            await _bot.Client.LoginBotIfNeeded();
+
+            const int BatchSize = 10;
+
+            var vodFiles = VODsFiles.OrderBy(Path.GetFileName).ToArray();
+
+            bool firstPack = true;
+
+            for (int offset = 0; offset < vodFiles.Length; offset += BatchSize)
+            {
+                var media = new List<IAlbumInputMedia>();
+                var openedStreams = new List<Stream>();
+
+                _log.Information($"Подготовка перекодированных фрагментов стрима (720p) для загрузки в чат телеграм канала {_tgChannelId}...");
+
+                try
+                {
+                    foreach (var file in vodFiles.Skip(offset).Take(BatchSize))
+                    {
+                        var thumb = Path.ChangeExtension(file, ".jpg");
+                        if (!File.Exists(thumb))
+                            CreateThumbnailForVideoFragment($"-ss 2 -i \"{file}\" -frames:v 1 -vf scale=320:-1 \"{thumb}\"");
+
+                        var duration = GetDurationSeconds(file); 
+
+                        var fs = File.OpenRead(file);
+                        var thumbStream = File.OpenRead(thumb);
+
+                        openedStreams.Add(fs);
+                        openedStreams.Add(thumbStream);
+
+                        media.Add(new InputMediaVideo(new InputFileStream(fs, Path.GetFileName(file)))
+                        {
+                            Width = 1280,
+                            Height = 720,
+                            Duration = duration,
+                            Thumbnail = new InputFileStream(thumbStream, Path.GetFileName(thumb)),
+                            SupportsStreaming = true
+                        });
+                    }
+
+                    _log.Information($"{media.Count} из {vodFiles.Length} перекодированных фрагментов (720p) стрима готовы к загрузке.");
+                }
+                catch (Exception ex)
+                {
+                    _log.Error(ex, "Не удалось подготовить список перекодированных фрагментов (720p) трансляции для загрузки. Требуется ручное вмешательство. Ошибка:");
+
+                    foreach (var s in openedStreams)
+                        s.Dispose();
+
+                    _streamInfo.Titles.Clear();
+                    _streamInfo.Categories.Clear();
+                    _streamOnlineMsgId = -1;
+
+                    break;
+                }
+
+                try
+                {
+                    await _sendLocker.WaitAsync(cts);
+
+                    _log.Information($"Начало загрузки перекодированных фрагментов (720p) стрима в чат телеграм канала {_tgChannelId}...");
+
+                    var msg720 = await Retry(async () => await _bot.SendMediaGroup
+                        (
+                            "@test_twitchVODs_loader_chat",
+                            media,
+                            disableNotification: true
+                        ), cts);
+
+                    if (firstPack)
+                    {
+                        firstPack = false;
+                        var first720 = msg720.FirstOrDefault();
+
+                        if (first720 != null)
+                        {
+                            _720msgId = first720.MessageId;
+                        }
+                    }
+
+                    _log.Information($"Фрагменты перекодированной трансляции (720p) ({media.Count} из {vodFiles.Length}) загружены успешно.");
+                }
+                catch (OperationCanceledException)
+                {
+                    _streamInfo.Titles.Clear();
+                    _streamInfo.Categories.Clear();
+                    _streamOnlineMsgId = -1;
+
+                    break;
+                }
+                finally
+                {
+                    _sendLocker.Release();
+
+                    foreach (var s in openedStreams)
+                        s.Dispose();
+                }
+            }
+
+            if (_streamOnlineMsgId == -1)
+                return;
+
+            var sb = new StringBuilder();
+            sb.AppendLine("✨New stream✨");
+            sb.AppendLine();
+            sb.AppendLine("💬 Тайтлы");
+            foreach (var t in _streamInfo.Titles) sb.AppendLine($"• {t}");
+            sb.AppendLine();
+            sb.AppendLine("🎮 Категории");
+            foreach (var c in _streamInfo.Categories) sb.AppendLine($"• {c}");
+            sb.AppendLine();
+            sb.AppendLine("👉 Начало - will be updated ✍");
+            sb.AppendLine();
+            sb.AppendLine("😱 Хайлайты");
+            sb.AppendLine("will be updated (мейби) ✍");
+            sb.AppendLine();
+            sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
+            sb.AppendLine();
+            sb.AppendLine($"1080p/720p ({_streamInfo.Date:dd.MM.yyyy})");
+            sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
+            var msgText = sb.ToString();
+
+            var entities = BuildEntities(msgText, true, _1080msgId, _720msgId);
+
+            for (int i = 1; i <= 10; i++)
+            {
+                try
+                {
+                    await _tgBot.EditMessageCaption
+                    (
+                        chatId: _tgChannelId,
+                        messageId: _streamOnlineMsgId,
+                        caption: msgText,
+                        captionEntities: entities,
+                        cancellationToken: cts
+                    );
+
+                    _log.Information
+                        (
+                        "Редактирование сообщения о начале стрима прошло успешно (добавлена информация о записях в 720p). Это финальное редактирование сообщения.\n" +
+                        "================================================================================"
+                        );
+
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    if (i == 10)
+                    {
+                        _log.Error(ex, "Финальное редактирование сообщения о начале стрима после нескольких попыток не удалось (информация о записях в 720p). Требуется ручное вмешательство. Ошибка:");
+
+                        break;
+                    }
+                    else
+                    {
+                        _log.Warning(ex, $"Попытка ({i}) финального редактирования сообщения о начале стрима не увенчалась успехом (информация о записях в 720p). Повтор через: {5 * i}c. Ошибка:");
 
                         await Task.Delay(TimeSpan.FromSeconds(5 * i), cts);
 
@@ -485,6 +679,7 @@ namespace TwitchStreamsRecorder
                 }
             }
 
+            _streamOnlineMsgId = -1;
             _streamInfo.Titles.Clear();
             _streamInfo.Categories.Clear();
         }
@@ -502,10 +697,10 @@ namespace TwitchStreamsRecorder
             return (int)info.Properties.Duration.TotalSeconds;
         }
 
-        private async Task Retry(Func<Task> action, CancellationToken ct, int max = 10)
+        private async Task<WTelegram.Types.Message[]> Retry(Func<Task<WTelegram.Types.Message[]>> action, CancellationToken ct, int max = 10)
         {
             for (int i = 1; i <= max; i++)
-                try { await action(); return; }
+                try { var msg = await action(); return msg; }
                 catch (RpcException ex) when (ex.Code == 420 && i < 10)   // FLOOD_WAIT
                 {
                     // "FLOOD_WAIT_37" → 37
@@ -528,6 +723,8 @@ namespace TwitchStreamsRecorder
                     _log.Error(ex, "Не удалось загрузить перекодированные фрагменты трансляции после нескольких попыток. Требуется ручное вмешательство. Ошибка:");
                     throw new OperationCanceledException();
                 }
+
+            throw new OperationCanceledException();
         }
         public async ValueTask DisposeAsync()
         {

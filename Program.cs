@@ -144,7 +144,11 @@ internal class Program
 
         _ws.StreamOnline += async (_, e) =>
         {
-            _log.Information("Стрим запущен, начало записи...");
+            _log.Information
+                (
+                "================================================================================\n" +
+                "Стрим запущен, начало записи..."
+                );
             IsLive = true;
 
             var sessionDirectory = DirectoriesManager.CreateSessionDirectory(null, config.ChannelLogin);
@@ -220,6 +224,13 @@ internal class Program
         var resultCleaner = new ResultCleanerService(
                  root: AppContext.BaseDirectory,
                  retention: TimeSpan.FromDays(14),
+                 logger: _log,
+                 stop: _cts.Token);
+        _ = resultCleaner.RunAsync();
+
+        var result720Cleaner = new Result720CleanerService(
+                 root: AppContext.BaseDirectory,
+                 retention: TimeSpan.FromHours(5),
                  logger: _log,
                  stop: _cts.Token);
         _ = resultCleaner.RunAsync();
