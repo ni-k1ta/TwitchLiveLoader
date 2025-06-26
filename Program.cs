@@ -233,7 +233,7 @@ internal class Program
                  retention: TimeSpan.FromHours(5),
                  logger: _log,
                  stop: _cts.Token);
-        _ = resultCleaner.RunAsync();
+        _ = result720Cleaner.RunAsync();
 
         var emptyCleaner = new EmptyDirectoryCleaner(AppContext.BaseDirectory, _cts.Token);
         _ = emptyCleaner.RunAsync();
