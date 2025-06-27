@@ -355,6 +355,8 @@ namespace TwitchStreamsRecorder
 
             bool firstPack = true;
 
+            int qscale = 1;
+
             for (int offset = 0; offset < vodFiles.Length; offset += BatchSize)
             {
                 var media = new List<IAlbumInputMedia>();
@@ -371,7 +373,18 @@ namespace TwitchStreamsRecorder
 
                         var thumb = Path.ChangeExtension(file, ".jpg");
                         if (!File.Exists(thumb))
-                            CreateThumbnailForVideoFragment($"-ss 2 -i \"{file}\" -frames:v 1 -vf scale=320:-1 \"{thumb}\"");
+                        {
+                            CreateThumbnailForVideoFragment($"-ss 2 -i \"{file}\" -frames:v 1 -vf \"scale=320:-1:flags=lanczos,format=yuv444p,unsharp=5:5:1.0:5:5:0.0\" -c:v mjpeg -qscale:v {qscale} -update 1 -map_metadata -1 \"{thumb}\"");
+
+                            var thumbInfo = new FileInfo(thumb);
+
+                            while (thumbInfo.Length >= (200 * 1024))
+                            {
+                                qscale++;
+                                CreateThumbnailForVideoFragment($"-ss 2 -i \"{file}\" -frames:v 1 -vf \"scale=320:-1:flags=lanczos,format=yuv444p,unsharp=5:5:1.0:5:5:0.0\" -c:v mjpeg -qscale:v {qscale} -update 1 -map_metadata -1 \"{thumb}\"");
+                                thumbInfo.Refresh();
+                            }
+                        }
 
                         // -- (в) получаем длительность ---------------------------------------------------
                         var duration = GetDurationSeconds(file);     // ffprobe или TagLib#
@@ -547,6 +560,8 @@ namespace TwitchStreamsRecorder
 
             bool firstPack = true;
 
+            int qscale = 1;
+
             for (int offset = 0; offset < vodFiles.Length; offset += BatchSize)
             {
                 var media = new List<IAlbumInputMedia>();
@@ -560,7 +575,18 @@ namespace TwitchStreamsRecorder
                     {
                         var thumb = Path.ChangeExtension(file, ".jpg");
                         if (!File.Exists(thumb))
-                            CreateThumbnailForVideoFragment($"-ss 2 -i \"{file}\" -frames:v 1 -vf scale=320:-1 \"{thumb}\"");
+                        {
+                            CreateThumbnailForVideoFragment($"-ss 2 -i \"{file}\" -frames:v 1 -vf \"scale=320:-1:flags=lanczos,format=yuv444p,unsharp=5:5:1.0:5:5:0.0\" -c:v mjpeg -qscale:v {qscale} -update 1 -map_metadata -1 \"{thumb}\"");
+
+                            var thumbInfo = new FileInfo(thumb);
+
+                            while (thumbInfo.Length >= (200 * 1024))
+                            {
+                                qscale++;
+                                CreateThumbnailForVideoFragment($"-ss 2 -i \"{file}\" -frames:v 1 -vf \"scale=320:-1:flags=lanczos,format=yuv444p,unsharp=5:5:1.0:5:5:0.0\" -c:v mjpeg -qscale:v {qscale} -update 1 -map_metadata -1 \"{thumb}\"");
+                                thumbInfo.Refresh();
+                            }
+                        }
 
                         var duration = GetDurationSeconds(file); 
 

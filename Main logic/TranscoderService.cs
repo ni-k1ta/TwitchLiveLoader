@@ -94,7 +94,7 @@ namespace TwitchStreamsRecorder
                     //ffmpegPsi.ArgumentList.Add("4");
                     ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
                     ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
-                    ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("medium");
+                    ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("slow");
                     ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("22");
                     //ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("aac");
                     //ffmpegPsi.ArgumentList.Add("-b:a"); ffmpegPsi.ArgumentList.Add("128k");
@@ -246,7 +246,7 @@ namespace TwitchStreamsRecorder
                 ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add($"{buff}");
                 ffmpegPsi.ArgumentList.Add("-vf"); ffmpegPsi.ArgumentList.Add("scale=-2:720");
                 ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
-                ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("medium");
+                ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("slow");
                 ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("22");
                 ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
                 ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
