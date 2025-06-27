@@ -91,7 +91,7 @@ namespace TwitchStreamsRecorder
                 Add(MessageEntityType.Blockquote, "will be updated (мейби) ✍");
                 Add(MessageEntityType.Code, "[таймкоды мейби будут в описаниях к записям]");
                 Add(MessageEntityType.Italic, $"({_streamInfo.Date:dd.MM.yyyy})");
-                Add(MessageEntityType.Blockquote, $"1080p/720p ({_streamInfo.Date:dd.MM.yyyy})");
+                Add(MessageEntityType.Blockquote, $"1080p\\/720p ({_streamInfo.Date:dd.MM.yyyy})");
                 if (msg1080Id != -1)
                     Add(MessageEntityType.TextLink, "1080p", $"https://t.me/cuuterina_vods/{msg1080Id}");
                 if (msg720Id != -1)
@@ -298,7 +298,7 @@ namespace TwitchStreamsRecorder
             sb.AppendLine();
             sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
             sb.AppendLine();
-            sb.AppendLine($"1080p/720p ({_streamInfo.Date:dd.MM.yyyy})");
+            sb.AppendLine($"1080p\\/720p ({_streamInfo.Date:dd.MM.yyyy})");
             sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
             var msgText = sb.ToString();
 
@@ -428,8 +428,8 @@ namespace TwitchStreamsRecorder
                         }
 
                         _log.Information($"При отправке сообщения в канал {_tgChannelId} (в данной ситуации речь идёт о сообщении с фрагментами перекодированной трансляции в 1080p), оно автоматически отправляется в привязанный чат {_tgChannelChatId} и закрепляется в нём. Сейчас это сообщение будет найдено и откреплено, чтобы в закреплённых в чате оставались только заглавные сообщения (фрагментов записи в 720p, которые будут загружаться позже, это не касается, т.к. они загружаются сразу в чат, а не в канал).");
-                        await Task.Delay(TimeSpan.FromSeconds(3), cts);
                         var chat = await _bot.GetChat(_tgChannelChatId);
+                        await Task.Delay(TimeSpan.FromSeconds(3), cts);
                         var message = chat.PinnedMessage;
 
                         _log.Information("Попытка открепеления найденного последнего закреплённого сообщения.");
@@ -438,7 +438,6 @@ namespace TwitchStreamsRecorder
                             while(!string.IsNullOrEmpty(message!.Text))
                             {
                                 await Task.Delay(TimeSpan.FromSeconds(3), cts);
-                                chat = await _bot.GetChat(_tgChannelChatId);
                                 message = chat.PinnedMessage;
                             }
 
@@ -490,7 +489,7 @@ namespace TwitchStreamsRecorder
             sb.AppendLine();
             sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
             sb.AppendLine();
-            sb.AppendLine($"1080p/720p ({_streamInfo.Date:dd.MM.yyyy})");
+            sb.AppendLine($"1080p\\/720p ({_streamInfo.Date:dd.MM.yyyy})");
             sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
             var msgText = sb.ToString();
 
@@ -657,7 +656,7 @@ namespace TwitchStreamsRecorder
             sb.AppendLine();
             sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
             sb.AppendLine();
-            sb.AppendLine($"1080p/720p ({_streamInfo.Date:dd.MM.yyyy})");
+            sb.AppendLine($"1080p\\/720p ({_streamInfo.Date:dd.MM.yyyy})");
             sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
             var msgText = sb.ToString();
 
@@ -703,6 +702,8 @@ namespace TwitchStreamsRecorder
                 }
             }
 
+            _1080msgId = -1;
+            _720msgId = -1;
             _streamOnlineMsgId = -1;
             _streamInfo.Titles.Clear();
             _streamInfo.Categories.Clear();
