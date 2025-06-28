@@ -22,7 +22,7 @@ namespace TwitchStreamsRecorder
 
         private readonly StreamInfo _streamInfo;
         private readonly string _tgChannelId;
-        private readonly string _tgChannelChatId = "@cuuterina_vods_chat";
+        private readonly string _tgChannelChatId;
         private readonly TelegramBotClient _tgBot;
         private int _streamOnlineMsgId = -1;
 
@@ -35,7 +35,7 @@ namespace TwitchStreamsRecorder
         private int _1080msgId = -1;
         private int _720msgId = -1;
 
-        public TelegramChannelService(string channelId, TelegramBotClient tgBot, int apiId, string apiHash, ILogger logger)
+        public TelegramChannelService(string channelId, string channeChatlId, TelegramBotClient tgBot, int apiId, string apiHash, ILogger logger)
         {
             _log = logger.ForContext("Source", "TelegramChannelService");
 
@@ -56,6 +56,7 @@ namespace TwitchStreamsRecorder
             _tgBot = tgBot;
 
             _tgChannelId = channelId;
+            _tgChannelChatId = channeChatlId;
             _streamInfo = new StreamInfo();
 
             _db = new SqliteConnection("Data Source=wtbot.db");
@@ -283,7 +284,7 @@ namespace TwitchStreamsRecorder
                 return;
 
             var sb = new StringBuilder();
-            sb.AppendLine("✨New stream✨ (Запись 1080p будет в течение пары часов, 720p чуть позже)");
+            sb.AppendLine("✨New stream✨ (Запись 1080p будет в течение +- пары часов, 720p - чуть позже)");
             sb.AppendLine();
             sb.AppendLine("💬 Тайтлы");
             foreach (var t in _streamInfo.Titles) sb.AppendLine($"• {t}");
@@ -345,7 +346,7 @@ namespace TwitchStreamsRecorder
             }
         }
 
-        public async Task SendFinalStreamVOD(IEnumerable<string> VODsFiles, CancellationToken cts)
+        public async Task SendFinalStreamVOD(IEnumerable<string> VODsFiles, int videoWidth, int videoHeight, CancellationToken cts)
         {
             await _bot.Client.LoginBotIfNeeded();
 
@@ -362,7 +363,7 @@ namespace TwitchStreamsRecorder
                 var media = new List<IAlbumInputMedia>();
                 var openedStreams = new List<Stream>();
 
-                _log.Information($"Подготовка перекодированных фрагментов стрима (1080p) для загрузки в телеграм канал {_tgChannelId}...");
+                _log.Information($"Подготовка перекодированных фрагментов стрима ({videoHeight}p) для загрузки в телеграм канал {_tgChannelId}...");
 
                 try
                 {
@@ -397,19 +398,19 @@ namespace TwitchStreamsRecorder
 
                         media.Add(new InputMediaVideo(new InputFileStream(fs, Path.GetFileName(file)))
                         {
-                            Width = 1920,
-                            Height = 1080,
+                            Width = videoWidth,
+                            Height = videoHeight,
                             Duration = duration,
                             Thumbnail = new InputFileStream(thumbStream, Path.GetFileName(thumb)),
                             SupportsStreaming = true
                         });
                     }
 
-                    _log.Information($"{media.Count} из {vodFiles.Length} перекодированных фрагментов (1080p) стрима готовы к загрузке.");
+                    _log.Information($"{media.Count} из {vodFiles.Length} перекодированных фрагментов ({videoHeight}p) стрима готовы к загрузке.");
                 }
                 catch (Exception ex)
                 {
-                    _log.Error(ex, "Не удалось подготовить список перекодированных фрагментов (1080p) трансляции для загрузки. Требуется ручное вмешательство. Ошибка:");
+                    _log.Error(ex, $"Не удалось подготовить список перекодированных фрагментов ({videoHeight}p) трансляции для загрузки. Требуется ручное вмешательство. Ошибка:");
 
                     foreach (var s in openedStreams)
                         s.Dispose();
@@ -425,11 +426,11 @@ namespace TwitchStreamsRecorder
                 {
                     await _sendLocker.WaitAsync(cts);
 
-                    _log.Information($"Начало загрузки перекодированных фрагментов (1080p) стрима в телеграм канал {_tgChannelId}...");
+                    _log.Information($"Начало загрузки перекодированных фрагментов ({videoHeight}p) стрима в телеграм канал {_tgChannelId}...");
 
                     var msg1080 = await Retry(async () => await _bot.SendMediaGroup(_tgChannelId, media), cts);
 
-                    _log.Information($"Фрагменты перекодированной трансляции (1080p) ({media.Count} из {vodFiles.Length}) загружены успешно.");
+                    _log.Information($"Фрагменты перекодированной трансляции ({videoHeight}p) ({media.Count} из {vodFiles.Length}) загружены успешно.");
 
                     var first1080 = msg1080.FirstOrDefault();
                     if (first1080 != null)
@@ -440,7 +441,7 @@ namespace TwitchStreamsRecorder
                             _1080msgId = first1080.MessageId;
                         }
 
-                        _log.Information($"При отправке сообщения в канал {_tgChannelId} (в данной ситуации речь идёт о сообщении с фрагментами перекодированной трансляции в 1080p), оно автоматически отправляется в привязанный чат {_tgChannelChatId} и закрепляется в нём. Сейчас это сообщение будет найдено и откреплено, чтобы в закреплённых в чате оставались только заглавные сообщения (фрагментов записи в 720p, которые будут загружаться позже, это не касается, т.к. они загружаются сразу в чат, а не в канал).");
+                        _log.Information($"При отправке сообщения в канал {_tgChannelId} (в данной ситуации речь идёт о сообщении с фрагментами перекодированной трансляции в {videoHeight}p), оно автоматически отправляется в привязанный чат {_tgChannelChatId} и закрепляется в нём. Сейчас это сообщение будет найдено и откреплено, чтобы в закреплённых в чате оставались только заглавные сообщения (фрагментов записи в 720p, которые будут загружаться позже, это не касается, т.к. они загружаются сразу в чат, а не в канал).");
                         var chat = await _bot.GetChat(_tgChannelChatId);
                         await Task.Delay(TimeSpan.FromSeconds(3), cts);
                         var message = chat.PinnedMessage;
@@ -448,14 +449,14 @@ namespace TwitchStreamsRecorder
                         _log.Information("Попытка открепеления найденного последнего закреплённого сообщения.");
                         if (message != null)
                         {
-                            while(!string.IsNullOrEmpty(message!.Text))
+                            while (!string.IsNullOrEmpty(message!.Text))
                             {
                                 await Task.Delay(TimeSpan.FromSeconds(3), cts);
                                 message = chat.PinnedMessage;
                             }
 
                             await _bot.PinUnpinChatMessage(_tgChannelChatId, message.MessageId, false, true);
-                            _log.Information($"Сообщение с фрагментами записи в 1080p успешно откреплено в чате {_tgChannelChatId}.");
+                            _log.Information($"Сообщение с фрагментами записи в {videoHeight}p успешно откреплено в чате {_tgChannelChatId}.");
                         }
                         else
                         {
@@ -521,7 +522,7 @@ namespace TwitchStreamsRecorder
                         cancellationToken: cts
                     );
 
-                    _log.Information("Редактирование сообщения о начале стрима прошло успешно (добавлена информация о записях в 1080p).");
+                    _log.Information($"Редактирование сообщения о начале стрима прошло успешно (добавлена информация о записях в {videoHeight}p).");
 
                     //_streamOnlineMsgId = -1;
 
@@ -531,7 +532,7 @@ namespace TwitchStreamsRecorder
                 {
                     if (i == 10)
                     {
-                        _log.Error(ex, "Pедактирование сообщения о начале стрима после нескольких попыток не удалось (информация о записях в 1080p). Требуется ручное вмешательство. Ошибка:");
+                        _log.Error(ex, $"Pедактирование сообщения о начале стрима после нескольких попыток не удалось (информация о записях в {videoHeight}p). Требуется ручное вмешательство. Ошибка:");
 
                         _streamOnlineMsgId = -1;
                         _streamInfo.Titles.Clear();
@@ -541,7 +542,7 @@ namespace TwitchStreamsRecorder
                     }
                     else
                     {
-                        _log.Warning(ex, $"Попытка ({i}) редактирования сообщения о начале стрима не увенчалась успехом (информация о записях в 1080p). Повтор через: {5 * i}c. Ошибка:");
+                        _log.Warning(ex, $"Попытка ({i}) редактирования сообщения о начале стрима не увенчалась успехом (информация о записях в {videoHeight}p). Повтор через: {5 * i}c. Ошибка:");
 
                         await Task.Delay(TimeSpan.FromSeconds(5 * i), cts);
 
@@ -550,6 +551,7 @@ namespace TwitchStreamsRecorder
                 }
             }
         }
+
         public async Task SendFinalStreamVOD720(IEnumerable<string> VODsFiles, CancellationToken cts)
         {
             await _bot.Client.LoginBotIfNeeded();
@@ -588,7 +590,7 @@ namespace TwitchStreamsRecorder
                             }
                         }
 
-                        var duration = GetDurationSeconds(file); 
+                        var duration = GetDurationSeconds(file);
 
                         var fs = File.OpenRead(file);
                         var thumbStream = File.OpenRead(thumb);
@@ -734,7 +736,7 @@ namespace TwitchStreamsRecorder
             _streamInfo.Titles.Clear();
             _streamInfo.Categories.Clear();
         }
-        static void CreateThumbnailForVideoFragment(string args)
+        private static void CreateThumbnailForVideoFragment(string args)
         {
             var p = Process.Start(new ProcessStartInfo("ffmpeg", "-y -loglevel error " + args)
             { RedirectStandardError = true });
@@ -742,9 +744,9 @@ namespace TwitchStreamsRecorder
             if (p.ExitCode != 0) throw new Exception("ffmpeg error: " + p.StandardError.ReadToEnd());
         }
 
-        static int GetDurationSeconds(string mp4)
+        private static int GetDurationSeconds(string mp4)
         {
-            var info = TagLib.File.Create(mp4);
+            using var info = TagLib.File.Create(mp4);
             return (int)info.Properties.Duration.TotalSeconds;
         }
 
@@ -782,195 +784,5 @@ namespace TwitchStreamsRecorder
             _bot.Dispose();
             await _db.DisposeAsync();
         }
-
-        //public async Task SendFinalStreamVOD(IEnumerable<string> VODsFiles, CancellationToken cts)
-        //{
-        //    // 1. откроем SQLite-файл
-        //    var db = new SqliteConnection("Data Source=wtbot.db");
-        //    db.Open();
-
-        //    using var bot = new Bot(_telegramBotToken, _apiId, _apiHash, db);
-
-        //    await bot.Client.LoginBotIfNeeded();
-
-        //    var chat = await bot.GetChat(_tgChannelId);
-
-        //    const int BatchSize = 10;
-        //    bool fatalBreak = false;
-
-        //    // Telegram предпочитает «естественную» сортировку имён файлов
-        //    var vodFiles = VODsFiles.OrderBy(Path.GetFileName).ToArray();
-
-        //    for (int offset = 0; offset < vodFiles.Length && !fatalBreak; offset += BatchSize)
-        //    {
-        //        // 1. Формируем группу (≤ 10 объектов)
-        //        List<IAlbumInputMedia> media;
-
-        //        // ---------- готовим до 10 файлов ----------
-        //        try
-        //        {
-        //            media = vodFiles.Skip(offset).Take(BatchSize)
-        //                .Select(path =>
-        //                {
-        //                    var fs = File.OpenRead(path);
-        //                    var file = new InputFileStream(fs, Path.GetFileName(path));
-
-        //                    return (IAlbumInputMedia)new InputMediaVideo(file)
-        //                    {
-        //                        SupportsStreaming = true
-        //                    };
-        //                })
-        //                .ToList();
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            _log.Error(ex, "Не удалось подготовить медиагруппу к загрузке; требуется ручное вмешательство");
-
-        //            break;
-        //        }
-
-        //        // 2. Пытаемся отправить медиагруппу с экспоненциальным бэк-оффом
-        //        for (int attempt = 1; attempt <= 10; attempt++)
-        //        {
-        //            try
-        //            {
-        //                await bot.SendMediaGroup
-        //                    (
-        //                        chatId: _tgChannelId,
-        //                        media: media
-        //                    );
-
-        //                _log.Information($"✅ batch {(offset / BatchSize) + 1}: {media.Count} файлов загружено");
-        //                break;                             // выходим из retry-цикла
-        //            }
-        //            catch (RpcException ex) when (attempt < 10)
-        //            {
-        //                var delay = TimeSpan.FromSeconds(5 * attempt);
-        //                _log.Warning(ex, $"Попытка {attempt} не удалась, retry через {delay.TotalSeconds} с");
-        //                await Task.Delay(delay, cts);
-        //            }
-        //            catch (Exception ex)
-        //            {
-        //                _log.Error(ex, "🥵 10 ошибок подряд — прерываю дальнейшую отправку");
-        //                fatalBreak = true;
-        //            }
-        //        }
-        //        foreach (var v in media.OfType<InputMediaVideo>())
-        //            (v.Media as InputFileStream)?.Content?.Dispose();
-        //    }
-
-        //    //const int Batch = 10;
-        //    //var vods = VODsFiles.OrderBy(f => f).ToList();
-
-        //    //for (int i = 0; i < vods.Count; i += Batch)
-        //    //{
-        //    //    var slice = vods.Skip(i).Take(Batch).ToList();
-
-        //    //    bool uploaded = false;
-        //    //    for (int attempt = 1; attempt <= 10 && !uploaded; attempt++)
-        //    //    {
-        //    //        // ── 1. строим новую медиагруппу ─────────────────────────────
-        //    //        var media = slice.Select(path =>
-        //    //        {
-        //    //            var fs = File.OpenRead(path);                       // fresh stream
-        //    //            var file = new InputFileStream(fs, Path.GetFileName(path));
-        //    //            return (IAlbumInputMedia)new InputMediaVideo(file)
-        //    //            { SupportsStreaming = true };
-        //    //        }).ToList();
-
-        //    //        try
-        //    //        {
-        //    //            await _tgBot.SendMediaGroup(_tgChannelId, media, cancellationToken: cts);
-        //    //            _log.Information($"Фрагменты перекодированной трансляции ({slice.Count} из {vods.Count}) загружены успешно.");
-        //    //            uploaded = true;
-        //    //        }
-        //    //        catch (Exception ex) when (attempt < 10)
-        //    //        {
-        //    //            _log.Warning(ex,
-        //    //                $"Попытка ({attempt}) загрузки перекодированных фрагментов трансляции ({media.Count} из {vods.Count}) не увенчалась успехом. Повтор через: {5 * attempt}c. Ошибка:");
-        //    //            await Task.Delay(TimeSpan.FromSeconds(5 * attempt), cts);
-        //    //        }
-        //    //        catch (Exception ex)   // 10-я не удалась
-        //    //        {
-        //    //            _log.Error(ex, "Не удалось загрузить перекодированные фрагменты трансляции. Требуется ручное вмешательство. Ошибка:");
-        //    //            return;            // или set fatalBreak=true
-        //    //        }
-        //    //        finally
-        //    //        {
-        //    //            // ── 2. закрываем все потоки независимо от успеха ───────
-        //    //            foreach (var m in media.OfType<InputMediaVideo>())
-        //    //                (m.Media as InputFileStream)?.Content?.Dispose();
-        //    //        }
-        //    //    }
-        //    //}
-
-
-        //    //bool fatalBreak = false;
-        //    //const int Batch = 10;
-        //    //var VODsList = VODsFiles.OrderBy(f => f).ToList();
-
-        //    //for (int i = 0; i < VODsList.Count && !fatalBreak; i += Batch)
-        //    //{
-        //    //    List<IAlbumInputMedia>? media = [];
-        //    //    try
-        //    //    {
-        //    //        media = VODsList.Skip(i).Take(Batch).Select((path, idx) =>
-        //    //        {
-        //    //            var fs = File.OpenRead(path);
-        //    //            var file = new InputFileStream(fs, Path.GetFileName(path));
-
-        //    //            return (IAlbumInputMedia)new InputMediaVideo(file)
-        //    //            {
-        //    //                SupportsStreaming = true
-        //    //            };
-        //    //        }).ToList();
-        //    //    }
-        //    //    catch (Exception ex)
-        //    //    {
-        //    //        _log.Error(ex, "Не удалось подготовить список перекодированных фрагментов трансляции для загрузки. Требуется ручное вмешательство. Ошибка:");
-
-        //    //        foreach (var m in media.OfType<InputMediaVideo>())
-        //    //            (m.Media as InputFileStream)?.Content?.Dispose();
-        //    //        media = null;
-
-        //    //        break;
-        //    //    }
-
-        //    //    for (int j = 1; j <= 10; j++)
-        //    //    {
-        //    //        try
-        //    //        {
-        //    //            await _tgBot.SendMediaGroup(_tgChannelId, media, cancellationToken: cts);
-
-        //    //            _log.Information($"Фрагменты перекодированной трансляции ({media.Count} из {VODsList.Count}) загружены успешно.");
-
-        //    //            break;
-        //    //        }
-        //    //        catch (Exception ex)
-        //    //        {
-        //    //            if (j == 10)
-        //    //            {
-        //    //                _log.Error(ex, "Не удалось загрузить перекодированные фрагменты трансляции. Требуется ручное вмешательство. Ошибка:");
-
-        //    //                fatalBreak = true;
-
-        //    //                break;
-        //    //            }
-        //    //            else
-        //    //            {
-        //    //                _log.Warning(ex, $"Попытка ({j}) загрузки перекодированных фрагментов трансляции ({media.Count} из {VODsList.Count}) не увенчалась успехом. Повтор через: {5 * j}c. Ошибка:");
-
-        //    //                await Task.Delay(TimeSpan.FromSeconds(5 * j), cts);
-
-        //    //                continue;
-        //    //            }
-        //    //        }
-        //    //    }
-
-        //    //    foreach (var m in media.OfType<InputMediaVideo>())
-        //    //        (m.Media as InputFileStream)?.Content?.Dispose();
-        //    //    media = null;
-        //    //}
-        //}
     }
 }

@@ -4,12 +4,12 @@ using System.Diagnostics;
 
 namespace TwitchStreamsRecorder
 {
-    internal class RecorderService(ConcurrentQueue<Task> pendingBufferCopies, ILogger log)
+    internal class RecorderService(ILogger log)
     {
         private int _bufferFileIndex = 0;
         private int _bufferSize;
         private BlockingCollection<string>? _bufferFilesQueue;
-        private readonly ConcurrentQueue<Task> _pendingBufferCopies = pendingBufferCopies;
+        private ConcurrentQueue<Task>? _pendingBufferCopies;
         private Process? _streamlinkProc;
 
         public Process? StreamlinkProc { get => _streamlinkProc; set => _streamlinkProc = value; }
@@ -93,7 +93,7 @@ namespace TwitchStreamsRecorder
 
                 _log.Information("Streamlink успешно запущен.");
 
-                _pendingBufferCopies.Enqueue(
+                _pendingBufferCopies!.Enqueue(
                     StartWritingFragmentsToBufferAsync(StreamlinkProc.StandardOutput.BaseStream, bufferFile, cts).ContinueWith(t =>
                         {
                             if (t.Exception != null)
@@ -119,7 +119,7 @@ namespace TwitchStreamsRecorder
 
             try
             {
-                await Task.WhenAll(_pendingBufferCopies.ToArray());
+                await Task.WhenAll(_pendingBufferCopies!.ToArray());
             }
             catch (Exception ex)
             {
@@ -140,7 +140,7 @@ namespace TwitchStreamsRecorder
             if (StreamlinkProc != null)
                 await StreamlinkProc!.WaitForExitAsync(cts);
 
-            await Task.WhenAll(_pendingBufferCopies);
+            await Task.WhenAll(_pendingBufferCopies!);
 
             if (StreamlinkProc != null)
             {
@@ -151,10 +151,11 @@ namespace TwitchStreamsRecorder
             _bufferFileIndex = 0;
             StreamlinkProc = null;
         }
-        public void SetBufferQueue(BlockingCollection<string> bufferFilesQueue, int bufferSize)
+        public void SetBufferQueue(BlockingCollection<string> bufferFilesQueue, int bufferSize, ConcurrentQueue<Task> tasks)
         {
             _bufferFilesQueue = bufferFilesQueue;
             _bufferSize = bufferSize;
+            _pendingBufferCopies = tasks;
         }
         private Task StartWritingFragmentsToBufferAsync(Stream stdout, string bufferFile, CancellationToken cts)
         {

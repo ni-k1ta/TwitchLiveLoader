@@ -82,7 +82,7 @@ internal class Program
 
         _log = channelLogger;
 
-        var recorder = new RecorderService(pendingBufferCopies, _log);
+        var recorder = new RecorderService(_log);
         var transcoder = new TranscoderService(_log);
 
         var api = new TwitchAPI();
@@ -114,16 +114,20 @@ internal class Program
 
         var eventSubscribe = new TwitchEventSubscribeManager(api, _ws, config, channelId, _log);
 
-        await using var tgChannel = new TelegramChannelService(config.TelegramChannelId, tgBot, 27680895, "8f219bef3d3da075c59e3084c7c0134c", _log);
+        await using var tgChannel = new TelegramChannelService(config.TelegramChannelId, config.TelegramChannelChatId, tgBot, 27680895, "8f219bef3d3da075c59e3084c7c0134c", _log);
 
         _ws.WebsocketConnected += async (_, __) =>
         {
             _log.Information($"WebSocket connected (session {_ws.SessionId})");
             await eventSubscribe.SubscribeStreamStatusAsync(token, json);
+
+            if (!IsLive)
+                (recordingTask, transcodingTask) = await CheckLiveAndStartAsync(api, twitchLink, channelId, recorder, transcoder, config, bufferFilesQueue, bufferSize, tgChannel, pendingBufferCopies);
         };
         _ws.WebsocketReconnected += (_, __) =>
         {
             _log.Information("WebSocket reconnected — re‑subscribing (подписки будут пересозданы, т.к. прежний ID WebSocket'а более невалидный)...");
+
             return Task.CompletedTask;
         };
 
@@ -144,53 +148,57 @@ internal class Program
 
         _ws.StreamOnline += async (_, e) =>
         {
-            _log.Information
-                (
-                "================================================================================\n" +
-                "Стрим запущен, начало записи..."
-                );
-            IsLive = true;
-
-            var sessionDirectory = DirectoriesManager.CreateSessionDirectory(null, config.ChannelLogin);
-
-            recorder.SetBufferQueue(bufferFilesQueue, bufferSize);
-            transcoder.SetBufferQueue(bufferFilesQueue, bufferSize);
-
-            recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, tgChannel, config.UserToken, _cts.Token));
-            transcodingTask = Task.Run(() => transcoder.StartTranscoding(sessionDirectory, tgChannel, _cts.Token));
-
-            if (_channelUpdHandler == null)
+            if (!IsLive)
             {
-                _channelUpdHandler = async (sender, e) =>
+                IsLive = true;
+
+                _log.Information
+                    (
+                    "================================================================================\n" +
+                    "Стрим запущен, начало записи..."
+                    );
+
+                var sessionDirectory = DirectoriesManager.CreateSessionDirectory(null, config.ChannelLogin);
+
+                recorder.SetBufferQueue(bufferFilesQueue, bufferSize, pendingBufferCopies);
+                transcoder.SetBufferQueue(bufferFilesQueue, bufferSize);
+
+                recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, tgChannel, config.UserToken, _cts.Token));
+                transcodingTask = Task.Run(() => transcoder.StartTranscoding(sessionDirectory, tgChannel, _cts.Token));
+
+                if (_channelUpdHandler == null)
                 {
-                    _debounceCts?.Cancel();
-                    _debounceCts?.Dispose();
-                    _debounceCts = new CancellationTokenSource();
-
-                    try
+                    _channelUpdHandler = async (sender, e) =>
                     {
-                        await Task.Delay(DebounceDelay, _debounceCts.Token);
+                        _debounceCts?.Cancel();
+                        _debounceCts?.Dispose();
+                        _debounceCts = new CancellationTokenSource();
 
-                        var (newTitle, newCategory) = await GetStreamInfoAsync(api, channelId);
+                        try
+                        {
+                            await Task.Delay(DebounceDelay, _debounceCts.Token);
 
-                        await tgChannel.UpdateStreamOnlineMsg(newTitle, newCategory, _cts.Token);
-                    }
-                    catch (OperationCanceledException) { }
-                };
+                            var (newTitle, newCategory) = await GetStreamInfoAsync(api, channelId);
 
-                _ws.ChannelUpdate += _channelUpdHandler;
+                            await tgChannel.UpdateStreamOnlineMsg(newTitle, newCategory, _cts.Token);
+                        }
+                        catch (OperationCanceledException) { }
+                    };
+
+                    _ws.ChannelUpdate += _channelUpdHandler;
+                }
+
+                var (title, category) = await GetStreamInfoAsync(api, channelId);
+
+                await tgChannel.SendStreamOnlineMsg(title, category, _cts.Token);
             }
-
-            var (title, category) = await GetStreamInfoAsync(api, channelId);
-
-            await tgChannel.SendStreamOnlineMsg(title, category, _cts.Token);
         };
 
         _ws.StreamOffline += async (_, e) => 
         {
-            _log.Information("Стрим завершён.");
-
             IsLive = false;
+
+            _log.Information("Стрим завершён.");
 
             _ = recorder.ResetAsync(_cts.Token);
             _ = transcoder.ResetAsync(_cts.Token);
@@ -208,8 +216,6 @@ internal class Program
         };
 
         await _ws.ConnectAsync();
-
-        (recordingTask, transcodingTask) = await CheckLiveAndStartAsync(api, twitchLink, channelId, recorder, transcoder, config, bufferFilesQueue, bufferSize, tgChannel);
 
         _ = Task.Run(() => token.RefreshLoopAsync(() => json.SaveConfig(config, ConfigService.GetDefaultConfigPath()), _cts.Token));
         _ = Task.Run(() => PendingQueueWatchDogAsync(pendingBufferCopies));
@@ -326,18 +332,19 @@ internal class Program
     static Task Safe(Task? t) => t ?? Task.CompletedTask;
     static Task Safe(Func<Task> asyncCall) => asyncCall == null ? Task.CompletedTask : Safe(asyncCall());
 
-    private static async Task<(Task? recordingTask, Task? transcodingTask)> CheckLiveAndStartAsync(TwitchAPI api, string twitchLink, string channelId, RecorderService recorder, TranscoderService transcoder, Config config, BlockingCollection<string> bufferFilesQueue, int bufferSize, TelegramChannelService tgChannel)
+    private static async Task<(Task? recordingTask, Task? transcodingTask)> CheckLiveAndStartAsync(TwitchAPI api, string twitchLink, string channelId, RecorderService recorder, TranscoderService transcoder, Config config, BlockingCollection<string> bufferFilesQueue, int bufferSize, TelegramChannelService tgChannel, ConcurrentQueue<Task> pendingBufferCopies)
     {
         var live = await api.Helix.Streams.GetStreamsAsync(userIds: [channelId]);
 
         if (live.Streams.Length > 0)
         {
+            IsLive = true;
+
             _log!.Information("Стрим уже идёт, начало записи (но не с начала стрима)...");
 
-            IsLive = true;
             var sessionDirectory = DirectoriesManager.CreateSessionDirectory(null, config.ChannelLogin);
 
-            recorder.SetBufferQueue(bufferFilesQueue, bufferSize);
+            recorder.SetBufferQueue(bufferFilesQueue, bufferSize, pendingBufferCopies);
             transcoder.SetBufferQueue(bufferFilesQueue, bufferSize);
 
             var recordingTask = Task.Run(() => recorder.StartRecording(twitchLink, sessionDirectory, tgChannel, config.UserToken, _cts.Token));

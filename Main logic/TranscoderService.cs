@@ -93,7 +93,7 @@ namespace TwitchStreamsRecorder
                     ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
                     ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
                     ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("veryslow");
-                    ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("18");
+                    ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("20");
                     //ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("aac");
                     //ffmpegPsi.ArgumentList.Add("-b:a"); ffmpegPsi.ArgumentList.Add("128k");
                     //ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
@@ -201,10 +201,30 @@ namespace TwitchStreamsRecorder
 
                 if (finalDir == null) return;
 
-                _ = StartTranscoding720(finalDir, tgChannel, cts);
+                var videosList = Directory.GetFiles(finalDir, "*.mp4");
+                var testVideo = videosList.FirstOrDefault();
 
-                await tgChannel.SendFinalStreamVOD(Directory.GetFiles(finalDir, "*.mp4"), cts);
+                if (testVideo != null)
+                {
+                    (int width, int height) = GetVideoRes(testVideo);
+
+                    if (height > 720)
+                    {
+                        _ = StartTranscoding720(finalDir, tgChannel, cts);
+                    }
+                    else
+                    {
+                        _log.Error("Качество оригинальной записи <= 720p => не будет запущено перекодирование в более сжатое качество, но это не учтено при формировании заглавного сообщения в канал. Требуется ручное редактирование сообщения.");
+                    }
+
+                    await tgChannel.SendFinalStreamVOD(videosList, width, height, cts);
+                }
             }
+        }
+        private static (int, int) GetVideoRes(string mp4)
+        {
+            using var info = TagLib.File.Create(mp4);
+            return (info.Properties.VideoWidth, info.Properties.VideoHeight);
         }
         public async Task StartTranscoding720(string pathForOutputResult, TelegramChannelService tgChannel, CancellationToken cts)
         {
@@ -245,7 +265,7 @@ namespace TwitchStreamsRecorder
                 ffmpegPsi.ArgumentList.Add("-vf"); ffmpegPsi.ArgumentList.Add("scale=-2:720");
                 ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
                 ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("veryslow");
-                ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("18");
+                ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("20");
                 ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
                 ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
                 ffmpegPsi.ArgumentList.Add("-segment_time"); ffmpegPsi.ArgumentList.Add("3600");
@@ -257,7 +277,7 @@ namespace TwitchStreamsRecorder
 
                 try
                 {
-                        FfmpegProc720 = Process.Start(ffmpegPsi);
+                    FfmpegProc720 = Process.Start(ffmpegPsi);
                 }
                 catch (Exception ex)
                 {

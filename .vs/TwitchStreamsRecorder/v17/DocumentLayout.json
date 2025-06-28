@@ -3,8 +3,48 @@
   "WorkspaceRootPath": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\network logic\\telegramchannelservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:network logic\\telegramchannelservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\main logic\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:main logic\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\helpers\\config.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:helpers\\config.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\helpers\\configservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:helpers\\configservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\logger logic\\logging.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:logger logic\\logging.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\logger logic\\telegramsink.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:logger logic\\telegramsink.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\main logic\\transcoderservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:main logic\\transcoderservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\main logic\\recorderservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:main logic\\recorderservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\network logic\\tokenrefresher.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:network logic\\tokenrefresher.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\network logic\\twitcheventsubscribemanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:network logic\\twitcheventsubscribemanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\helpers\\directoriesmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:helpers\\directoriesmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\cleaners\\logcleanerservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -29,46 +69,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\cleaners\\resultcleanerservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:cleaners\\resultcleanerservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\logger logic\\logging.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:logger logic\\logging.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\logger logic\\telegramsink.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:logger logic\\telegramsink.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\network logic\\telegramchannelservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:network logic\\telegramchannelservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\main logic\\transcoderservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:main logic\\transcoderservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\main logic\\recorderservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:main logic\\recorderservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\network logic\\tokenrefresher.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:network logic\\tokenrefresher.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\network logic\\twitcheventsubscribemanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:network logic\\twitcheventsubscribemanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\helpers\\directoriesmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:helpers\\directoriesmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\helpers\\configservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:helpers\\configservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\helpers\\config.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:helpers\\config.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -78,17 +78,17 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 10,
+          "SelectedChildIndex": 7,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 16,
+              "DocumentIndex": 2,
               "Title": "Config.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Helpers\\Config.cs",
               "RelativeDocumentMoniker": "Helpers\\Config.cs",
               "ToolTip": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Helpers\\Config.cs",
               "RelativeToolTip": "Helpers\\Config.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAA9AAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAABAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-05-31T22:20:06.411Z",
               "IsPinned": true,
@@ -96,13 +96,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 15,
+              "DocumentIndex": 3,
               "Title": "ConfigService.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Helpers\\ConfigService.cs",
               "RelativeDocumentMoniker": "Helpers\\ConfigService.cs",
               "ToolTip": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Helpers\\ConfigService.cs",
               "RelativeToolTip": "Helpers\\ConfigService.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAACQAAAAJAAAAAAAAAA==",
+              "ViewState": "AgIAAA0AAAAAAAAAAAAgwCQAAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-01T20:00:25.985Z",
               "IsPinned": true,
@@ -110,7 +110,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 14,
+              "DocumentIndex": 10,
               "Title": "DirectoriesManager.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Helpers\\DirectoriesManager.cs",
               "RelativeDocumentMoniker": "Helpers\\DirectoriesManager.cs",
@@ -124,7 +124,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 13,
+              "DocumentIndex": 9,
               "Title": "TwitchEventSubscribeManager.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Network logic\\TwitchEventSubscribeManager.cs",
               "RelativeDocumentMoniker": "Network logic\\TwitchEventSubscribeManager.cs",
@@ -138,7 +138,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 8,
               "Title": "TokenRefresher.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Network logic\\TokenRefresher.cs",
               "RelativeDocumentMoniker": "Network logic\\TokenRefresher.cs",
@@ -152,13 +152,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 7,
               "Title": "RecorderService.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Main logic\\RecorderService.cs",
               "RelativeDocumentMoniker": "Main logic\\RecorderService.cs",
               "ToolTip": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Main logic\\RecorderService.cs",
               "RelativeToolTip": "Main logic\\RecorderService.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAGAAAAB2AAAAAAAAAA==",
+              "ViewState": "AgIAAFkAAAAAAAAAAAAwwJMAAAAZAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-01T00:31:54.545Z",
               "IsPinned": true,
@@ -166,13 +166,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 6,
               "Title": "TranscoderService.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Main logic\\TranscoderService.cs",
               "RelativeDocumentMoniker": "Main logic\\TranscoderService.cs",
               "ToolTip": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Main logic\\TranscoderService.cs",
               "RelativeToolTip": "Main logic\\TranscoderService.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAABSAAAAAAAAAA==",
+              "ViewState": "AgIAADsAAAAAAAAAAAAIwBEBAABZAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-01T00:32:09.557Z",
               "IsPinned": true,
@@ -180,13 +180,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 0,
               "Title": "TelegramChannelService.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Network logic\\TelegramChannelService.cs",
               "RelativeDocumentMoniker": "Network logic\\TelegramChannelService.cs",
               "ToolTip": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Network logic\\TelegramChannelService.cs",
               "RelativeToolTip": "Network logic\\TelegramChannelService.cs",
-              "ViewState": "AgIAAIAAAAAAAAAAAAAuwHsAAABjAAAAAAAAAA==",
+              "ViewState": "AgIAAAICAAAAAAAAAAAkwBUCAAAVAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-12T19:22:03.483Z",
               "IsPinned": true,
@@ -194,7 +194,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 5,
               "Title": "TelegramSink.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Logger logic\\TelegramSink.cs",
               "RelativeDocumentMoniker": "Logger logic\\TelegramSink.cs",
@@ -208,7 +208,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 4,
               "Title": "Logging.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Logger logic\\Logging.cs",
               "RelativeDocumentMoniker": "Logger logic\\Logging.cs",
@@ -222,13 +222,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "Program.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Main logic\\Program.cs",
               "RelativeDocumentMoniker": "Main logic\\Program.cs",
               "ToolTip": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Main logic\\Program.cs",
               "RelativeToolTip": "Main logic\\Program.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAOAAAAAAAAAA==",
+              "ViewState": "AgIAANcAAAAAAAAAAAAowG0AAAASAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-12T19:36:56.015Z",
               "IsPinned": true,
@@ -240,7 +240,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 13,
               "Title": "Result720CleanerService.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Cleaners\\Result720CleanerService.cs",
               "RelativeDocumentMoniker": "Cleaners\\Result720CleanerService.cs",
@@ -248,12 +248,11 @@
               "RelativeToolTip": "Cleaners\\Result720CleanerService.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAwAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-26T06:12:44.812Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-26T06:12:44.812Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 12,
               "Title": "DiskSpaceGuard.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Cleaners\\DiskSpaceGuard.cs",
               "RelativeDocumentMoniker": "Cleaners\\DiskSpaceGuard.cs",
@@ -261,12 +260,11 @@
               "RelativeToolTip": "Cleaners\\DiskSpaceGuard.cs",
               "ViewState": "AgIAAAYAAAAAAAAAAAAAABcAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-16T23:33:00.802Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-16T23:33:00.802Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 11,
               "Title": "LogCleanerService.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Cleaners\\LogCleanerService.cs",
               "RelativeDocumentMoniker": "Cleaners\\LogCleanerService.cs",
@@ -274,12 +272,11 @@
               "RelativeToolTip": "Cleaners\\LogCleanerService.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAABAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-14T22:22:51.578Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-14T22:22:51.578Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 16,
               "Title": "ResultCleanerService.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Cleaners\\ResultCleanerService.cs",
               "RelativeDocumentMoniker": "Cleaners\\ResultCleanerService.cs",
@@ -287,12 +284,11 @@
               "RelativeToolTip": "Cleaners\\ResultCleanerService.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAADkAAAAVAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-14T00:22:27.197Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-14T00:22:27.197Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 15,
               "Title": "BufferCleanerService.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Cleaners\\BufferCleanerService.cs",
               "RelativeDocumentMoniker": "Cleaners\\BufferCleanerService.cs",
@@ -300,12 +296,11 @@
               "RelativeToolTip": "Cleaners\\BufferCleanerService.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAAAnAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-14T00:05:13.616Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-14T00:05:13.616Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 14,
               "Title": "EmptyDirectoryCleaner.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Cleaners\\EmptyDirectoryCleaner.cs",
               "RelativeDocumentMoniker": "Cleaners\\EmptyDirectoryCleaner.cs",
@@ -313,8 +308,7 @@
               "RelativeToolTip": "Cleaners\\EmptyDirectoryCleaner.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABYAAABAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-14T00:55:42.868Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-14T00:55:42.868Z"
             }
           ]
         }
