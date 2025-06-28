@@ -1,25 +1,16 @@
 ﻿using Serilog;
 
-internal sealed class LogCleanerService
+internal sealed class LogCleanerService(string directory,
+                         string pattern,
+                         TimeSpan retention,
+                         ILogger logger,
+                         CancellationToken ct)
 {
-    private readonly string _dir;         
-    private readonly string _pattern;     
-    private readonly TimeSpan _retention; 
-    private readonly ILogger _log;
-    private readonly CancellationToken _ct;
-
-    public LogCleanerService(string directory,
-                             string pattern,
-                             TimeSpan retention,
-                             ILogger logger,
-                             CancellationToken ct)
-    {
-        _dir = directory;
-        _pattern = pattern;
-        _retention = retention;
-        _log = logger.ForContext("Source", "LogCleaner");
-        _ct = ct;
-    }
+    private readonly string _dir = directory;         
+    private readonly string _pattern = pattern;     
+    private readonly TimeSpan _retention = retention; 
+    private readonly ILogger _log = logger.ForContext("Source", "LogCleaner");
+    private readonly CancellationToken _ct = ct;
 
     public Task RunAsync() => Task.Run(LoopAsync, _ct);
 

@@ -195,7 +195,7 @@ internal class Program
             _ = recorder.ResetAsync(_cts.Token);
             _ = transcoder.ResetAsync(_cts.Token);
 
-            bufferFilesQueue = new BlockingCollection<string>();
+            bufferFilesQueue = [];
 
             pendingBufferCopies = new ConcurrentQueue<Task>();
 

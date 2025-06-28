@@ -15,8 +15,8 @@ namespace TwitchStreamsRecorder
     {
         private class StreamInfo
         {
-            public List<string> Titles { get; } = new();
-            public List<string> Categories { get; } = new();
+            public List<string> Titles { get; } = [];
+            public List<string> Categories { get; } = [];
             public DateTime Date { get; set; }
         }
 

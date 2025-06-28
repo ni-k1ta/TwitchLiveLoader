@@ -5,7 +5,7 @@ using System.Diagnostics;
 
 namespace TwitchStreamsRecorder
 {
-    internal class TranscoderService
+    internal class TranscoderService(ILogger logger)
     {
         private int _outputFileIndex = 0;
         private int _bufferSize;
@@ -16,9 +16,7 @@ namespace TwitchStreamsRecorder
         public Process? FfmpegProc { get => _ffmpegProc; set => _ffmpegProc = value; }
         public Process? FfmpegProc720 { get => _ffmpegProc720; set => _ffmpegProc720 = value; }
 
-        private readonly ILogger _log;
-
-        public TranscoderService(ILogger logger) { _log = logger.ForContext("Source", "Transcoder"); }
+        private readonly ILogger _log = logger.ForContext("Source", "Transcoder");
 
         private string PrepareToTranscoding(string transcodeResultDirectory)
         {
@@ -94,8 +92,8 @@ namespace TwitchStreamsRecorder
                     //ffmpegPsi.ArgumentList.Add("4");
                     ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
                     ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
-                    ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("slow");
-                    ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("22");
+                    ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("veryslow");
+                    ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("18");
                     //ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("aac");
                     //ffmpegPsi.ArgumentList.Add("-b:a"); ffmpegPsi.ArgumentList.Add("128k");
                     //ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
@@ -246,8 +244,8 @@ namespace TwitchStreamsRecorder
                 ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add($"{buff}");
                 ffmpegPsi.ArgumentList.Add("-vf"); ffmpegPsi.ArgumentList.Add("scale=-2:720");
                 ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
-                ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("slow");
-                ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("22");
+                ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("veryslow");
+                ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("18");
                 ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
                 ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
                 ffmpegPsi.ArgumentList.Add("-segment_time"); ffmpegPsi.ArgumentList.Add("3600");

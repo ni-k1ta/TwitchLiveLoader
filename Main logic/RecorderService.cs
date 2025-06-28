@@ -4,25 +4,20 @@ using System.Diagnostics;
 
 namespace TwitchStreamsRecorder
 {
-    internal class RecorderService
+    internal class RecorderService(ConcurrentQueue<Task> pendingBufferCopies, ILogger log)
     {
         private int _bufferFileIndex = 0;
         private int _bufferSize;
         private BlockingCollection<string>? _bufferFilesQueue;
-        private readonly ConcurrentQueue<Task> _pendingBufferCopies;
+        private readonly ConcurrentQueue<Task> _pendingBufferCopies = pendingBufferCopies;
         private Process? _streamlinkProc;
 
         public Process? StreamlinkProc { get => _streamlinkProc; set => _streamlinkProc = value; }
 
-        private readonly ILogger _log;
+        private readonly ILogger _log = log.ForContext("Source", "Recorder");
 
         DiskSpaceGuard? _diskGuard = null;
 
-        public RecorderService(ConcurrentQueue<Task> pendingBufferCopies, ILogger log)
-        {
-            _pendingBufferCopies = pendingBufferCopies;
-            _log = log.ForContext("Source", "Recorder");
-        }
         private string PrepareToRecording(string recordBufferDirectory)
         {
             var bufferFile = Path.Combine(recordBufferDirectory, $"buffer{_bufferFileIndex++}.ts");
@@ -98,14 +93,12 @@ namespace TwitchStreamsRecorder
 
                 _log.Information("Streamlink успешно запущен.");
 
-                _pendingBufferCopies.Enqueue
-                    (
+                _pendingBufferCopies.Enqueue(
                     StartWritingFragmentsToBufferAsync(StreamlinkProc.StandardOutput.BaseStream, bufferFile, cts).ContinueWith(t =>
-                    {
-                        if (t.Exception != null)
-                            Console.Error.WriteLine(t.Exception);
-                    }
-                    ));
+                        {
+                            if (t.Exception != null)
+                                Console.Error.WriteLine(t.Exception);
+                        }, cts));
 
                 StreamlinkProc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.Error.WriteLine(e.Data); };
                 StreamlinkProc.BeginErrorReadLine();

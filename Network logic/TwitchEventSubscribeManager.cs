@@ -19,11 +19,11 @@ namespace TwitchStreamsRecorder
         private int _isRunning;
 
         private static readonly (string Type, string Version)[] _events =
-        {
+        [
             ("stream.online",  "1"),
             ("stream.offline", "1"),
             ("channel.update", "2")
-        };
+        ];
 
 
         public TwitchEventSubscribeManager(TwitchAPI api, EventSubWebsocketClient ws, Config cfg, string channelId, ILogger logger)
