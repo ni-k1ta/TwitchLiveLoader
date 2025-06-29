@@ -1,5 +1,6 @@
 ﻿using Microsoft.Data.Sqlite;
 using Serilog;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 using Telegram.Bot;
@@ -32,8 +33,11 @@ namespace TwitchStreamsRecorder
         private readonly ILogger _log;
 
         private static readonly SemaphoreSlim _sendLocker = new(1, 1);
-        private int _1080msgId = -1;
-        private int _720msgId = -1;
+
+        private readonly ConcurrentDictionary<int, TaskCompletionSource<int>> _rootMsgIds = new();
+        private int _maxBatch = 0;
+        int _lastPin = -1;
+        private TaskCompletionSource<int> GetTcs(int batchNo) =>_rootMsgIds.GetOrAdd(batchNo, _ => new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously));
 
         public TelegramChannelService(string channelId, string channeChatlId, TelegramBotClient tgBot, int apiId, string apiHash, ILogger logger)
         {
@@ -41,6 +45,12 @@ namespace TwitchStreamsRecorder
 
             WTelegram.Helpers.Log = (lvl, txt) =>
             {
+                if (lvl == 4 && txt.Contains("RpcError 420"))
+                {
+                    _log.Warning(txt);
+                    return;
+                }
+
                 switch (lvl)
                 {
                     //case 1: _log.Debug(txt); break;
@@ -62,9 +72,22 @@ namespace TwitchStreamsRecorder
             _db = new SqliteConnection("Data Source=wtbot.db");
             _db.Open();
 
-            _bot = new Bot(_tgBot.Token, apiId, apiHash, _db);
+            string? TgConfig(string key) => key switch
+            {
+                "bot_token" => _tgBot.Token,
+                "api_id" => apiId.ToString(),
+                "api_hash" => apiHash,
+
+                "upload_threads" => "2",
+                "upload_chunk" => "2097152",
+                "flood_delay" => "750",
+                _ => null
+            };
+
+            _bot = new Bot(TgConfig, _db);
         }
-        private Telegram.Bot.Types.MessageEntity[] BuildEntities(string text, bool endMsg, int msg1080Id = -1, int msg720Id = -1)
+
+        private Telegram.Bot.Types.MessageEntity[] BuildEntities(string text, bool endMsg, bool done1080, bool done720)
         {
             var list = new List<Telegram.Bot.Types.MessageEntity>();
 
@@ -92,11 +115,20 @@ namespace TwitchStreamsRecorder
                 Add(MessageEntityType.Blockquote, "will be updated (мейби) ✍");
                 Add(MessageEntityType.Code, "[таймкоды мейби будут в описаниях к записям]");
                 Add(MessageEntityType.Italic, $"({_streamInfo.Date:dd.MM.yyyy})");
-                Add(MessageEntityType.Blockquote, $"1080p\\/720p ({_streamInfo.Date:dd.MM.yyyy})");
-                if (msg1080Id != -1)
-                    Add(MessageEntityType.TextLink, "1080p", $"https://t.me/cuuterina_vods/{msg1080Id}");
-                if (msg720Id != -1)
-                    Add(MessageEntityType.TextLink, "720p", $"https://t.me/cuuterina_vods_chat/{msg720Id}");
+
+                if (!done1080 && !done720)
+                    Add(MessageEntityType.Blockquote, $"({_streamInfo.Date:dd.MM.yyyy})");
+                if (done1080)
+                {
+                    Add(MessageEntityType.Blockquote, $"~> 720p скоро будет в комментах <~ ||| ({_streamInfo.Date:dd.MM.yyyy})");
+                    Add(MessageEntityType.Italic, "~> 720p скоро будет в комментах <~");
+                }
+                if (done720)
+                {
+                    Add(MessageEntityType.Blockquote, $"~> 720p в комментах <~ ||| ({_streamInfo.Date:dd.MM.yyyy})");
+                    Add(MessageEntityType.Italic, "~> 720p в комментах <~");
+                }
+                    
                 Add(MessageEntityType.TextLink, "Twitch", "https://www.twitch.tv/cuuterina");
                 Add(MessageEntityType.TextLink, "TG", "https://t.me/cuuterina");
                 Add(MessageEntityType.TextLink, "Inst", "http://www.instagram.com/cuuterina");
@@ -126,7 +158,7 @@ namespace TwitchStreamsRecorder
         {
             _streamInfo.Titles.Add(title);
             _streamInfo.Categories.Add(category);
-            _streamInfo.Date = DateTime.Today;
+            _streamInfo.Date = DateTime.UtcNow.AddHours(3);
 
             var sb = new StringBuilder();
             sb.AppendLine("✨ТЫК --> New stream is live now <-- ТЫК✨");
@@ -141,7 +173,7 @@ namespace TwitchStreamsRecorder
             sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
             var msgText = sb.ToString();
 
-            var entities = BuildEntities(msgText, false);
+            var entities = BuildEntities(msgText, false, false, false);
 
             for (int i = 1; i <= 10; i++)
             {
@@ -232,7 +264,7 @@ namespace TwitchStreamsRecorder
             sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
             var msgText = sb.ToString();
 
-            var entities = BuildEntities(msgText, false);
+            var entities = BuildEntities(msgText, false, false, false);
 
             for (int i = 1; i <= 10; i++)
             {
@@ -284,7 +316,7 @@ namespace TwitchStreamsRecorder
                 return;
 
             var sb = new StringBuilder();
-            sb.AppendLine("✨New stream✨ (Запись 1080p будет в течение +- пары часов, 720p - чуть позже)");
+            sb.AppendLine("✨New stream✨ (Запись 1080p будет в течение +- пары часов, 720p - чуть позже в комментах)");
             sb.AppendLine();
             sb.AppendLine("💬 Тайтлы");
             foreach (var t in _streamInfo.Titles) sb.AppendLine($"• {t}");
@@ -299,11 +331,11 @@ namespace TwitchStreamsRecorder
             sb.AppendLine();
             sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
             sb.AppendLine();
-            sb.AppendLine($"1080p\\/720p ({_streamInfo.Date:dd.MM.yyyy})");
+            sb.AppendLine($"({_streamInfo.Date:dd.MM.yyyy})");
             sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
             var msgText = sb.ToString();
 
-            var entities = BuildEntities(msgText, true);
+            var entities = BuildEntities(msgText, true, false, false);
 
             for (int i = 1; i <= 10; i++)
             {
@@ -319,8 +351,6 @@ namespace TwitchStreamsRecorder
                     );
 
                     _log.Information("Редактирование сообщения о начале стрима перед загрузкой записей прошло успешно.");
-
-                    //_streamOnlineMsgId = -1;
 
                     break;
                 }
@@ -354,8 +384,6 @@ namespace TwitchStreamsRecorder
 
             var vodFiles = VODsFiles.OrderBy(Path.GetFileName).ToArray();
 
-            bool firstPack = true;
-
             int qscale = 1;
 
             for (int offset = 0; offset < vodFiles.Length; offset += BatchSize)
@@ -387,8 +415,7 @@ namespace TwitchStreamsRecorder
                             }
                         }
 
-                        // -- (в) получаем длительность ---------------------------------------------------
-                        var duration = GetDurationSeconds(file);     // ffprobe или TagLib#
+                        var duration = GetDurationSeconds(file);
 
                         var fs = File.OpenRead(file);
                         var thumbStream = File.OpenRead(thumb);
@@ -406,7 +433,7 @@ namespace TwitchStreamsRecorder
                         });
                     }
 
-                    _log.Information($"{media.Count} из {vodFiles.Length} перекодированных фрагментов ({videoHeight}p) стрима готовы к загрузке.");
+                    _log.Information($"{offset + media.Count} из {vodFiles.Length} перекодированных фрагментов ({videoHeight}p) стрима готовы к загрузке.");
                 }
                 catch (Exception ex)
                 {
@@ -422,6 +449,9 @@ namespace TwitchStreamsRecorder
                     break;
                 }
 
+                var batchNo = offset / BatchSize;
+                var tcs = GetTcs(batchNo);
+
                 try
                 {
                     await _sendLocker.WaitAsync(cts);
@@ -430,48 +460,59 @@ namespace TwitchStreamsRecorder
 
                     var msg1080 = await Retry(async () => await _bot.SendMediaGroup(_tgChannelId, media), cts);
 
-                    _log.Information($"Фрагменты перекодированной трансляции ({videoHeight}p) ({media.Count} из {vodFiles.Length}) загружены успешно.");
+                    _log.Information($"Фрагменты перекодированной трансляции ({videoHeight}p) ({offset + media.Count} из {vodFiles.Length}) загружены успешно.");
 
-                    var first1080 = msg1080.FirstOrDefault();
-                    if (first1080 != null)
+                    _log.Information($"При отправке сообщения в канал {_tgChannelId} (в данной ситуации речь идёт о сообщении с фрагментами перекодированной трансляции в {videoHeight}p),оно автоматически отправляется в привязанный чат {_tgChannelChatId} и закрепляется в нём. Сейчас это сообщение будет найдено и откреплено, чтобы в закреплённых в чатеоставались только заглавные сообщения (фрагментов записи в 720p, которые будут загружаться позже, это не касается, т.к. они загружаются сразу в чат в комментарии кзаписям в {videoHeight}p, а не в канал).");
+                    
+                    await Task.Delay(TimeSpan.FromSeconds(3), cts);
+                    var chat = await _bot.GetChat(_tgChannelChatId);
+                    var message = chat.PinnedMessage;
+
+                    _log.Information("Попытка открепеления найденного последнего закреплённого сообщения.");
+                    if (message != null)
                     {
-                        if (firstPack)
+                        int i = 0;
+                        while ((_lastPin != -1 && message!.MessageId == _lastPin) || !string.IsNullOrEmpty(message!.Caption))
                         {
-                            firstPack = false;
-                            _1080msgId = first1080.MessageId;
-                        }
-
-                        _log.Information($"При отправке сообщения в канал {_tgChannelId} (в данной ситуации речь идёт о сообщении с фрагментами перекодированной трансляции в {videoHeight}p), оно автоматически отправляется в привязанный чат {_tgChannelChatId} и закрепляется в нём. Сейчас это сообщение будет найдено и откреплено, чтобы в закреплённых в чате оставались только заглавные сообщения (фрагментов записи в 720p, которые будут загружаться позже, это не касается, т.к. они загружаются сразу в чат, а не в канал).");
-                        var chat = await _bot.GetChat(_tgChannelChatId);
-                        await Task.Delay(TimeSpan.FromSeconds(3), cts);
-                        var message = chat.PinnedMessage;
-
-                        _log.Information("Попытка открепеления найденного последнего закреплённого сообщения.");
-                        if (message != null)
-                        {
-                            while (!string.IsNullOrEmpty(message!.Text))
+                            if (i == 10)
                             {
-                                await Task.Delay(TimeSpan.FromSeconds(3), cts);
-                                message = chat.PinnedMessage;
+                                _log.Warning("Не удалось получить нужное закреплённое сообщение в чате канала. Требуется ручное вмешательство.");
+                                throw new OperationCanceledException();
                             }
 
-                            await _bot.PinUnpinChatMessage(_tgChannelChatId, message.MessageId, false, true);
-                            _log.Information($"Сообщение с фрагментами записи в {videoHeight}p успешно откреплено в чате {_tgChannelChatId}.");
-                        }
-                        else
-                        {
-                            _log.Warning("Не было найдено закреплённое сообщение.");
+                            i++;
+                            await Task.Delay(TimeSpan.FromSeconds(3), cts);
+                            chat = await _bot.GetChat(_tgChannelChatId);
+                            message = chat.PinnedMessage;
                         }
 
-                        chat = null;
-                        message = null;
+                        _lastPin = message.MessageId;
+                        await _bot.PinUnpinChatMessage(_tgChannelChatId, message.MessageId, false, true);
+                        _log.Information($"Сообщение с фрагментами записи в {videoHeight}p успешно откреплено в чате {_tgChannelChatId}.");
+
+                        tcs.TrySetResult(message.MessageId);
+                        _maxBatch = batchNo;
                     }
+                    else
+                    {
+                        _log.Warning("Не было найдено закреплённое сообщение.");
+                    }
+
+                    chat = null;
+                    message = null;
                 }
                 catch (OperationCanceledException)
                 {
                     _streamInfo.Titles.Clear();
                     _streamInfo.Categories.Clear();
                     _streamOnlineMsgId = -1;
+                    tcs.TrySetCanceled(cts);
+
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _log.Error(ex, $"Неожиданные проблемы при цикле загрузки в телеграм канал {_tgChannelChatId} и последующей обработки фрагментов записей в {videoHeight}p. Ошибка:");
 
                     break;
                 }
@@ -483,6 +524,8 @@ namespace TwitchStreamsRecorder
                         s.Dispose();
                 }
             }
+
+            _lastPin = -1;
 
             if (_streamOnlineMsgId == -1)
                 return;
@@ -503,11 +546,11 @@ namespace TwitchStreamsRecorder
             sb.AppendLine();
             sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
             sb.AppendLine();
-            sb.AppendLine($"1080p\\/720p ({_streamInfo.Date:dd.MM.yyyy})");
+            sb.AppendLine($"~> 720p скоро будет в комментах <~ ||| ({_streamInfo.Date:dd.MM.yyyy})");
             sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
             var msgText = sb.ToString();
 
-            var entities = BuildEntities(msgText, true, _1080msgId);
+            var entities = BuildEntities(msgText, true, true, false);
 
             for (int i = 1; i <= 10; i++)
             {
@@ -523,8 +566,6 @@ namespace TwitchStreamsRecorder
                     );
 
                     _log.Information($"Редактирование сообщения о начале стрима прошло успешно (добавлена информация о записях в {videoHeight}p).");
-
-                    //_streamOnlineMsgId = -1;
 
                     break;
                 }
@@ -560,8 +601,6 @@ namespace TwitchStreamsRecorder
 
             var vodFiles = VODsFiles.OrderBy(Path.GetFileName).ToArray();
 
-            bool firstPack = true;
-
             int qscale = 1;
 
             for (int offset = 0; offset < vodFiles.Length; offset += BatchSize)
@@ -569,7 +608,7 @@ namespace TwitchStreamsRecorder
                 var media = new List<IAlbumInputMedia>();
                 var openedStreams = new List<Stream>();
 
-                _log.Information($"Подготовка перекодированных фрагментов стрима (720p) для загрузки в чат телеграм канала {_tgChannelId}...");
+                _log.Information($"Подготовка перекодированных фрагментов стрима (720p) для загрузки в чат (в комментарии к предыдущим загруженным записям) телеграм канала {_tgChannelId}...");
 
                 try
                 {
@@ -608,7 +647,7 @@ namespace TwitchStreamsRecorder
                         });
                     }
 
-                    _log.Information($"{media.Count} из {vodFiles.Length} перекодированных фрагментов (720p) стрима готовы к загрузке.");
+                    _log.Information($"{offset + media.Count} из {vodFiles.Length} перекодированных фрагментов (720p) стрима готовы к загрузке.");
                 }
                 catch (Exception ex)
                 {
@@ -628,25 +667,40 @@ namespace TwitchStreamsRecorder
                 {
                     await _sendLocker.WaitAsync(cts);
 
-                    _log.Information($"Начало загрузки перекодированных фрагментов (720p) стрима в чат телеграм канала {_tgChannelId}...");
+                    _log.Information($"Начало загрузки перекодированных фрагментов (720p) стрима в чат (в комментарии к предыдущим загруженным записям) телеграм канала {_tgChannelId}...");
+
+                    var batch = (offset / BatchSize);
+
+                    var batchNo = batch > _maxBatch ? _maxBatch : batch;
+                    var tcs = GetTcs(batchNo);
+
+                    int replyTo;
+
+                    try
+                    {
+                        replyTo = await tcs.Task;  
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _log.Error($"Batch {batchNo}: 1080 отменён – пропускаем 720.");
+                        throw;
+                    }
+
+                    ReplyParameters replyParameters = new()
+                    {
+                        AllowSendingWithoutReply = true,
+                        MessageId = replyTo
+                    };
 
                     var msg720 = await Retry(async () => await _bot.SendMediaGroup
                         (
                             _tgChannelChatId,
                             media,
-                            disableNotification: true
+                            disableNotification: true,
+                            replyParameters: replyParameters
                         ), cts);
 
-                    if (firstPack)
-                    {
-                        firstPack = false;
-                        var first720 = msg720.FirstOrDefault();
-
-                        if (first720 != null)
-                            _720msgId = first720.MessageId;
-                    }
-
-                    _log.Information($"Фрагменты перекодированной трансляции (720p) ({media.Count} из {vodFiles.Length}) загружены успешно.");
+                    _log.Information($"Фрагменты перекодированной трансляции (720p) ({offset + media.Count} из {vodFiles.Length}) загружены успешно.");
                 }
                 catch (OperationCanceledException)
                 {
@@ -684,11 +738,11 @@ namespace TwitchStreamsRecorder
             sb.AppendLine();
             sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
             sb.AppendLine();
-            sb.AppendLine($"1080p\\/720p ({_streamInfo.Date:dd.MM.yyyy})");
+            sb.AppendLine($"~> 720p в комментах <~ ||| ({_streamInfo.Date:dd.MM.yyyy})");
             sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
             var msgText = sb.ToString();
 
-            var entities = BuildEntities(msgText, true, _1080msgId, _720msgId);
+            var entities = BuildEntities(msgText, true, false, true);
 
             for (int i = 1; i <= 10; i++)
             {
@@ -730,8 +784,7 @@ namespace TwitchStreamsRecorder
                 }
             }
 
-            _1080msgId = -1;
-            _720msgId = -1;
+            _rootMsgIds.Clear();
             _streamOnlineMsgId = -1;
             _streamInfo.Titles.Clear();
             _streamInfo.Categories.Clear();
@@ -754,14 +807,13 @@ namespace TwitchStreamsRecorder
         {
             for (int i = 1; i <= max; i++)
                 try { var msg = await action(); return msg; }
-                catch (RpcException ex) when (ex.Code == 420 && i < 10)   // FLOOD_WAIT
+                catch (RpcException ex) when (ex.Code == 420 && i < 10)
                 {
-                    // "FLOOD_WAIT_37" → 37
-                    var secs = int.Parse(ex.Message.AsSpan(11));          // 11 = "FLOOD_WAIT_".Length
+                    var secs = int.Parse(ex.Message.AsSpan(11));
                     _log.Warning(ex, $"Слишком много запросов при загрузке перекодированных фрагментов трансляции, повторная попытка через {secs}с.");
                     await Task.Delay(TimeSpan.FromSeconds(secs), ct);
                 }
-                catch (RpcException ex) when (ex.Code == 303 && i < 10)   // FILE/NETWORK_MIGRATE
+                catch (RpcException ex) when (ex.Code == 303 && i < 10)
                 {
                     _log.Warning(ex, "FILE/NETWORK_MIGRATE (DC migrate) при загрузке перекодированных фрагментов трансляции. Повтор...");
                     continue;
