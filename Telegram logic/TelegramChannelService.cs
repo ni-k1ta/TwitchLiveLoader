@@ -1,27 +1,22 @@
-﻿using Microsoft.Data.Sqlite;
+﻿using FFMpegCore;
+using Microsoft.Data.Sqlite;
 using Serilog;
 using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Text;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
-using Telegram.Bot.Types.Enums;
 using TL;
+using TwitchStreamsRecorder.Network_logic;
+using TwitchStreamsRecorder.Telegram_logic;
 using WTelegram;
 
 namespace TwitchStreamsRecorder
 {
     internal class TelegramChannelService : IAsyncDisposable
     {
-        private class StreamInfo
-        {
-            public List<string> Titles { get; } = [];
-            public List<string> Categories { get; } = [];
-            public DateTime Date { get; set; }
-        }
+        private readonly ThumbnailGenerator _thumbnailGenerator;
 
-        private readonly StreamInfo _streamInfo;
+        private readonly HeadlineTelegramMessageBuilder.StreamInfo _streamInfo;
         private readonly string _tgChannelId;
         private readonly string _tgChannelChatId;
         private readonly TelegramBotClient _tgBot;
@@ -39,7 +34,7 @@ namespace TwitchStreamsRecorder
         int _lastPin = -1;
         private TaskCompletionSource<int> GetTcs(int batchNo) =>_rootMsgIds.GetOrAdd(batchNo, _ => new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously));
 
-        public TelegramChannelService(string channelId, string channeChatlId, TelegramBotClient tgBot, int apiId, string apiHash, ILogger logger)
+        public TelegramChannelService(string channelId, string channeChatId, TelegramBotClient tgBot, int apiId, string apiHash, ILogger logger)
         {
             _log = logger.ForContext("Source", "TelegramChannelService");
 
@@ -66,8 +61,8 @@ namespace TwitchStreamsRecorder
             _tgBot = tgBot;
 
             _tgChannelId = channelId;
-            _tgChannelChatId = channeChatlId;
-            _streamInfo = new StreamInfo();
+            _tgChannelChatId = channeChatId;
+            _streamInfo = new HeadlineTelegramMessageBuilder.StreamInfo();
 
             _db = new SqliteConnection("Data Source=wtbot.db");
             _db.Open();
@@ -85,73 +80,7 @@ namespace TwitchStreamsRecorder
             };
 
             _bot = new Bot(TgConfig, _db);
-        }
-
-        private Telegram.Bot.Types.MessageEntity[] BuildEntities(string text, bool endMsg, bool done1080, bool done720)
-        {
-            var list = new List<Telegram.Bot.Types.MessageEntity>();
-
-            void Add(MessageEntityType type, string token, string? url = null)
-            {
-                int index = text.IndexOf(token);
-                if (index < 0) return;
-                var entity = new Telegram.Bot.Types.MessageEntity
-                {
-                    Type = type,
-                    Offset = index,
-                    Length = token.Length
-                };
-                if (url != null) entity.Url = url;
-                list.Add(entity);
-            }
-
-            if (endMsg)
-            {
-                Add(MessageEntityType.Bold, "New stream");
-                Add(MessageEntityType.Italic, "New stream");
-                Add(MessageEntityType.Bold, "Тайтлы");
-                Add(MessageEntityType.Bold, "Категории");
-                Add(MessageEntityType.Bold, "Хайлайты");
-                Add(MessageEntityType.Blockquote, "will be updated (мейби) ✍");
-                Add(MessageEntityType.Code, "[таймкоды мейби будут в описаниях к записям]");
-                Add(MessageEntityType.Italic, $"({_streamInfo.Date:dd.MM.yyyy})");
-
-                if (!done1080 && !done720)
-                    Add(MessageEntityType.Blockquote, $"({_streamInfo.Date:dd.MM.yyyy})");
-                if (done1080)
-                {
-                    Add(MessageEntityType.Blockquote, $"~> 720p скоро будет в комментах <~ ||| ({_streamInfo.Date:dd.MM.yyyy})");
-                    Add(MessageEntityType.Italic, "~> 720p скоро будет в комментах <~");
-                }
-                if (done720)
-                {
-                    Add(MessageEntityType.Blockquote, $"~> 720p в комментах <~ ||| ({_streamInfo.Date:dd.MM.yyyy})");
-                    Add(MessageEntityType.Italic, "~> 720p в комментах <~");
-                }
-                    
-                Add(MessageEntityType.TextLink, "Twitch", "https://www.twitch.tv/cuuterina");
-                Add(MessageEntityType.TextLink, "TG", "https://t.me/cuuterina");
-                Add(MessageEntityType.TextLink, "Inst", "http://www.instagram.com/cuuterina");
-                Add(MessageEntityType.TextLink, "TikTok", "https://www.tiktok.com/@qqter1na?_t=8grZAk04CmI&_r=1");
-                Add(MessageEntityType.TextLink, "DA", "https://www.donationalerts.com/r/cuuterina");
-            }
-            else
-            {
-                Add(MessageEntityType.Bold, "New stream is live now");
-                Add(MessageEntityType.Italic, "New stream is live now");
-                Add(MessageEntityType.TextLink, "New stream is live now", "https://www.twitch.tv/cuuterina");
-                Add(MessageEntityType.Bold, "Тайтлы");
-                Add(MessageEntityType.Bold, "Категории");
-                Add(MessageEntityType.Italic, $"({_streamInfo.Date:dd.MM.yyyy})");
-                Add(MessageEntityType.Blockquote, $"({_streamInfo.Date:dd.MM.yyyy})");
-                Add(MessageEntityType.TextLink, "Twitch", "https://www.twitch.tv/cuuterina");
-                Add(MessageEntityType.TextLink, "TG", "https://t.me/cuuterina");
-                Add(MessageEntityType.TextLink, "Inst", "http://www.instagram.com/cuuterina");
-                Add(MessageEntityType.TextLink, "TikTok", "https://www.tiktok.com/@qqter1na?_t=8grZAk04CmI&_r=1");
-                Add(MessageEntityType.TextLink, "DA", "https://www.donationalerts.com/r/cuuterina");
-            }
-
-            return list.ToArray();
+            _thumbnailGenerator = new(logger);
         }
 
         public async Task SendStreamOnlineMsg(string title, string category, CancellationToken cts)
@@ -160,20 +89,7 @@ namespace TwitchStreamsRecorder
             _streamInfo.Categories.Add(category);
             _streamInfo.Date = DateTime.UtcNow.AddHours(3);
 
-            var sb = new StringBuilder();
-            sb.AppendLine("✨ТЫК --> New stream is live now <-- ТЫК✨");
-            sb.AppendLine();
-            sb.AppendLine("💬 Тайтлы");
-            sb.AppendLine($"• {_streamInfo.Titles.First()}");
-            sb.AppendLine();
-            sb.AppendLine("🎮 Категории");
-            sb.AppendLine($"• {_streamInfo.Categories.First()}");
-            sb.AppendLine();
-            sb.AppendLine($"({_streamInfo.Date:dd.MM.yyyy})");
-            sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
-            var msgText = sb.ToString();
-
-            var entities = BuildEntities(msgText, false, false, false);
+            (var msgText, var entities) = HeadlineTelegramMessageBuilder.Build(_streamInfo, HeadlineTelegramMessageBuilder.SessionStage.Live);
 
             for (int i = 1; i <= 10; i++)
             {
@@ -236,35 +152,28 @@ namespace TwitchStreamsRecorder
             bool nt = false;
             bool nc = false;
 
-            if (!_streamInfo.Titles.Contains(newTitle) && newTitle != null)
+            if (!string.IsNullOrWhiteSpace(newTitle) && !_streamInfo.Titles.Contains(newTitle))
             {
                 _streamInfo.Titles.Add(newTitle);
                 nt = true;
             }
 
-            if (!_streamInfo.Categories.Contains(newCategory) && newCategory != null)
+            if (!string.IsNullOrWhiteSpace(newCategory) && !_streamInfo.Categories.Contains(newCategory))
             {
                 _streamInfo.Categories.Add(newCategory);
-                nt = true;
+                nc = true;
             }
 
             if (!nt && !nc)
                 return;
 
-            var sb = new StringBuilder();
-            sb.AppendLine("✨ТЫК --> New stream is live now <-- ТЫК✨");
-            sb.AppendLine();
-            sb.AppendLine("💬 Тайтлы");
-            foreach (var t in _streamInfo.Titles) sb.AppendLine($"• {t}");
-            sb.AppendLine();
-            sb.AppendLine("🎮 Категории");
-            foreach (var c in _streamInfo.Categories) sb.AppendLine($"• {c}");
-            sb.AppendLine();
-            sb.AppendLine($"({_streamInfo.Date:dd.MM.yyyy})");
-            sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
-            var msgText = sb.ToString();
+            (var msgText, var entities) = HeadlineTelegramMessageBuilder.Build(_streamInfo, HeadlineTelegramMessageBuilder.SessionStage.Live);
 
-            var entities = BuildEntities(msgText, false, false, false);
+            if (msgText.Length > 1024)
+            {
+                _log.Error($"Попытка редактирования заглавного сообщения привела к тому, что количество символов превысило 1024 => редактирование отменено. Планировалось добавление: {(nt ? "тайтла - " + newTitle + ". " : string.Empty)} {(nc ? "категории - " + newCategory + "." : string.Empty)}");
+                return;
+            }
 
             for (int i = 1; i <= 10; i++)
             {
@@ -315,27 +224,7 @@ namespace TwitchStreamsRecorder
             if (_streamOnlineMsgId == -1)
                 return;
 
-            var sb = new StringBuilder();
-            sb.AppendLine("✨New stream✨ (Запись 1080p будет в течение +- пары часов, 720p - чуть позже в комментах)");
-            sb.AppendLine();
-            sb.AppendLine("💬 Тайтлы");
-            foreach (var t in _streamInfo.Titles) sb.AppendLine($"• {t}");
-            sb.AppendLine();
-            sb.AppendLine("🎮 Категории");
-            foreach (var c in _streamInfo.Categories) sb.AppendLine($"• {c}");
-            sb.AppendLine();
-            sb.AppendLine("👉 Начало - will be updated ✍");
-            sb.AppendLine();
-            sb.AppendLine("😱 Хайлайты");
-            sb.AppendLine("will be updated (мейби) ✍");
-            sb.AppendLine();
-            sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
-            sb.AppendLine();
-            sb.AppendLine($"({_streamInfo.Date:dd.MM.yyyy})");
-            sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
-            var msgText = sb.ToString();
-
-            var entities = BuildEntities(msgText, true, false, false);
+            (var msgText, var entities) = HeadlineTelegramMessageBuilder.Build(_streamInfo, HeadlineTelegramMessageBuilder.SessionStage.LiveEnded);
 
             for (int i = 1; i <= 10; i++)
             {
@@ -384,8 +273,6 @@ namespace TwitchStreamsRecorder
 
             var vodFiles = VODsFiles.OrderBy(Path.GetFileName).ToArray();
 
-            int qscale = 1;
-
             for (int offset = 0; offset < vodFiles.Length; offset += BatchSize)
             {
                 var media = new List<IAlbumInputMedia>();
@@ -400,22 +287,9 @@ namespace TwitchStreamsRecorder
                         if (file.Contains("temp"))
                             continue;
 
-                        var thumb = Path.ChangeExtension(file, ".jpg");
-                        if (!File.Exists(thumb))
-                        {
-                            CreateThumbnailForVideoFragment($"-ss 2 -i \"{file}\" -frames:v 1 -vf \"scale=320:-1:flags=lanczos,format=yuv444p,unsharp=5:5:1.0:5:5:0.0\" -c:v mjpeg -qscale:v {qscale} -update 1 -map_metadata -1 \"{thumb}\"");
+                        var thumb = await _thumbnailGenerator.GenerateAsync(file, new ThumbnailOptions(Seek: TimeSpan.FromSeconds(2)), cts);
 
-                            var thumbInfo = new FileInfo(thumb);
-
-                            while (thumbInfo.Length >= (200 * 1024))
-                            {
-                                qscale++;
-                                CreateThumbnailForVideoFragment($"-ss 2 -i \"{file}\" -frames:v 1 -vf \"scale=320:-1:flags=lanczos,format=yuv444p,unsharp=5:5:1.0:5:5:0.0\" -c:v mjpeg -qscale:v {qscale} -update 1 -map_metadata -1 \"{thumb}\"");
-                                thumbInfo.Refresh();
-                            }
-                        }
-
-                        var duration = GetDurationSeconds(file);
+                        var duration = await GetDurationSeconds(file);
 
                         var fs = File.OpenRead(file);
                         var thumbStream = File.OpenRead(thumb);
@@ -462,7 +336,7 @@ namespace TwitchStreamsRecorder
 
                     _log.Information($"Фрагменты перекодированной трансляции ({videoHeight}p) ({offset + media.Count} из {vodFiles.Length}) загружены успешно.");
 
-                    _log.Information($"При отправке сообщения в канал {_tgChannelId} (в данной ситуации речь идёт о сообщении с фрагментами перекодированной трансляции в {videoHeight}p),оно автоматически отправляется в привязанный чат {_tgChannelChatId} и закрепляется в нём. Сейчас это сообщение будет найдено и откреплено, чтобы в закреплённых в чатеоставались только заглавные сообщения (фрагментов записи в 720p, которые будут загружаться позже, это не касается, т.к. они загружаются сразу в чат в комментарии кзаписям в {videoHeight}p, а не в канал).");
+                    _log.Information($"При отправке сообщения в канал {_tgChannelId} (в данной ситуации речь идёт о сообщении с фрагментами перекодированной трансляции в {videoHeight}p),оно автоматически отправляется в привязанный чат {_tgChannelChatId} и закрепляется в нём. Сейчас это сообщение будет найдено и откреплено, чтобы в закреплённых в чате оставались только заглавные сообщения (фрагментов записи в 720p, которые будут загружаться позже, это не касается, т.к. они загружаются в комментарии к записям в {videoHeight}p, а не в канал).");
                     
                     await Task.Delay(TimeSpan.FromSeconds(3), cts);
                     var chat = await _bot.GetChat(_tgChannelChatId);
@@ -530,27 +404,7 @@ namespace TwitchStreamsRecorder
             if (_streamOnlineMsgId == -1)
                 return;
 
-            var sb = new StringBuilder();
-            sb.AppendLine("✨New stream✨");
-            sb.AppendLine();
-            sb.AppendLine("💬 Тайтлы");
-            foreach (var t in _streamInfo.Titles) sb.AppendLine($"• {t}");
-            sb.AppendLine();
-            sb.AppendLine("🎮 Категории");
-            foreach (var c in _streamInfo.Categories) sb.AppendLine($"• {c}");
-            sb.AppendLine();
-            sb.AppendLine("👉 Начало - will be updated ✍");
-            sb.AppendLine();
-            sb.AppendLine("😱 Хайлайты");
-            sb.AppendLine("will be updated (мейби) ✍");
-            sb.AppendLine();
-            sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
-            sb.AppendLine();
-            sb.AppendLine($"~> 720p скоро будет в комментах <~ ||| ({_streamInfo.Date:dd.MM.yyyy})");
-            sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
-            var msgText = sb.ToString();
-
-            var entities = BuildEntities(msgText, true, true, false);
+            (var msgText, var entities) = HeadlineTelegramMessageBuilder.Build(_streamInfo, HeadlineTelegramMessageBuilder.SessionStage.Vod1080Uploaded);
 
             for (int i = 1; i <= 10; i++)
             {
@@ -601,8 +455,6 @@ namespace TwitchStreamsRecorder
 
             var vodFiles = VODsFiles.OrderBy(Path.GetFileName).ToArray();
 
-            int qscale = 1;
-
             for (int offset = 0; offset < vodFiles.Length; offset += BatchSize)
             {
                 var media = new List<IAlbumInputMedia>();
@@ -614,22 +466,9 @@ namespace TwitchStreamsRecorder
                 {
                     foreach (var file in vodFiles.Skip(offset).Take(BatchSize))
                     {
-                        var thumb = Path.ChangeExtension(file, ".jpg");
-                        if (!File.Exists(thumb))
-                        {
-                            CreateThumbnailForVideoFragment($"-ss 2 -i \"{file}\" -frames:v 1 -vf \"scale=320:-1:flags=lanczos,format=yuv444p,unsharp=5:5:1.0:5:5:0.0\" -c:v mjpeg -qscale:v {qscale} -update 1 -map_metadata -1 \"{thumb}\"");
+                        var thumb = await _thumbnailGenerator.GenerateAsync(file, new ThumbnailOptions(Seek: TimeSpan.FromSeconds(2)), cts);
 
-                            var thumbInfo = new FileInfo(thumb);
-
-                            while (thumbInfo.Length >= (200 * 1024))
-                            {
-                                qscale++;
-                                CreateThumbnailForVideoFragment($"-ss 2 -i \"{file}\" -frames:v 1 -vf \"scale=320:-1:flags=lanczos,format=yuv444p,unsharp=5:5:1.0:5:5:0.0\" -c:v mjpeg -qscale:v {qscale} -update 1 -map_metadata -1 \"{thumb}\"");
-                                thumbInfo.Refresh();
-                            }
-                        }
-
-                        var duration = GetDurationSeconds(file);
+                        var duration = await GetDurationSeconds(file);
 
                         var fs = File.OpenRead(file);
                         var thumbStream = File.OpenRead(thumb);
@@ -678,7 +517,7 @@ namespace TwitchStreamsRecorder
 
                     try
                     {
-                        replyTo = await tcs.Task;  
+                        replyTo = await tcs.Task;
                     }
                     catch (OperationCanceledException)
                     {
@@ -722,27 +561,7 @@ namespace TwitchStreamsRecorder
             if (_streamOnlineMsgId == -1)
                 return;
 
-            var sb = new StringBuilder();
-            sb.AppendLine("✨New stream✨");
-            sb.AppendLine();
-            sb.AppendLine("💬 Тайтлы");
-            foreach (var t in _streamInfo.Titles) sb.AppendLine($"• {t}");
-            sb.AppendLine();
-            sb.AppendLine("🎮 Категории");
-            foreach (var c in _streamInfo.Categories) sb.AppendLine($"• {c}");
-            sb.AppendLine();
-            sb.AppendLine("👉 Начало - will be updated ✍");
-            sb.AppendLine();
-            sb.AppendLine("😱 Хайлайты");
-            sb.AppendLine("will be updated (мейби) ✍");
-            sb.AppendLine();
-            sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
-            sb.AppendLine();
-            sb.AppendLine($"~> 720p в комментах <~ ||| ({_streamInfo.Date:dd.MM.yyyy})");
-            sb.AppendLine("Twitch ⬩ TG ⬩ Inst ⬩ TikTok ⬩ DA");
-            var msgText = sb.ToString();
-
-            var entities = BuildEntities(msgText, true, false, true);
+            (var msgText, var entities) = HeadlineTelegramMessageBuilder.Build(_streamInfo, HeadlineTelegramMessageBuilder.SessionStage.Final);
 
             for (int i = 1; i <= 10; i++)
             {
@@ -789,18 +608,11 @@ namespace TwitchStreamsRecorder
             _streamInfo.Titles.Clear();
             _streamInfo.Categories.Clear();
         }
-        private static void CreateThumbnailForVideoFragment(string args)
-        {
-            var p = Process.Start(new ProcessStartInfo("ffmpeg", "-y -loglevel error " + args)
-            { RedirectStandardError = true });
-            p!.WaitForExit();
-            if (p.ExitCode != 0) throw new Exception("ffmpeg error: " + p.StandardError.ReadToEnd());
-        }
 
-        private static int GetDurationSeconds(string mp4)
+        public static async Task<int> GetDurationSeconds(string videoFile)
         {
-            using var info = TagLib.File.Create(mp4);
-            return (int)info.Properties.Duration.TotalSeconds;
+            var mediaInfo = await FFProbe.AnalyseAsync(videoFile);
+            return (int)(Math.Round(mediaInfo.Duration.TotalSeconds));
         }
 
         private async Task<WTelegram.Types.Message[]> Retry(Func<Task<WTelegram.Types.Message[]>> action, CancellationToken ct, int max = 10)

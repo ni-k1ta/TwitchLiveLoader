@@ -10,8 +10,8 @@ namespace TwitchStreamsRecorder
         public string RefreshToken { get; set; } = string.Empty;
         public string ChannelLogin { get; set; } = string.Empty;
         public string TelegramChannelId { get; set; } = string.Empty;
-        public string TelegramBotToken { get; set; } = string.Empty;
         public string TelegramChannelChatId { get; set; } = string.Empty;
+        public string TelegramBotToken { get; set; } = string.Empty;
 
         [JsonIgnore] public string? OutputDir { get; set; }
 

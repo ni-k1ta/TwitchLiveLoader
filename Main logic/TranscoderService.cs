@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Routing.Constraints;
-using Serilog;
+﻿using Serilog;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace TwitchStreamsRecorder
 {
@@ -12,7 +13,6 @@ namespace TwitchStreamsRecorder
         private BlockingCollection<string>? _bufferFilesQueue;
 
         private Process? _ffmpegProc; private Process? _ffmpegProc720;
-
         public Process? FfmpegProc { get => _ffmpegProc; set => _ffmpegProc = value; }
         public Process? FfmpegProc720 { get => _ffmpegProc720; set => _ffmpegProc720 = value; }
 
@@ -26,7 +26,6 @@ namespace TwitchStreamsRecorder
         {
             if (_bufferFilesQueue == null)
                 throw new InvalidOperationException("Buffer queue is not set. Call SetBufferQueue() first.");
-
 
             if (FfmpegProc is not null && !FfmpegProc.HasExited)
                 return;
@@ -78,7 +77,6 @@ namespace TwitchStreamsRecorder
                 {
                     ffmpegPsi.ArgumentList.Add("-hwaccel"); ffmpegPsi.ArgumentList.Add("qsv");
                     ffmpegPsi.ArgumentList.Add("-hwaccel_output_format"); ffmpegPsi.ArgumentList.Add("qsv");
-                    //ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("hevc_qsv");
                     ffmpegPsi.ArgumentList.Add("-extra_hw_frames"); ffmpegPsi.ArgumentList.Add("64");
                     ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
                     ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("hevc_qsv");
@@ -87,23 +85,10 @@ namespace TwitchStreamsRecorder
                 }
                 else
                 {
-                    //ffmpegPsi.ArgumentList.Add("-y");
-                    //ffmpegPsi.ArgumentList.Add("-threads");
-                    //ffmpegPsi.ArgumentList.Add("4");
                     ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
                     ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
                     ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("veryslow");
                     ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("20");
-                    //ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("aac");
-                    //ffmpegPsi.ArgumentList.Add("-b:a"); ffmpegPsi.ArgumentList.Add("128k");
-                    //ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
-                    //ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
-                    //ffmpegPsi.ArgumentList.Add("-segment_time"); ffmpegPsi.ArgumentList.Add("3600");
-                    //ffmpegPsi.ArgumentList.Add("-reset_timestamps"); ffmpegPsi.ArgumentList.Add("1");
-                    //ffmpegPsi.ArgumentList.Add("-segment_format"); ffmpegPsi.ArgumentList.Add("mp4");
-                    //ffmpegPsi.ArgumentList.Add("-strftime"); ffmpegPsi.ArgumentList.Add("1");
-                    ////ffmpegPsi.ArgumentList.Add("-movflags"); ffmpegPsi.ArgumentList.Add("+faststart");
-                    //ffmpegPsi.ArgumentList.Add(outFile);
                 }
                 ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
                 ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
@@ -133,7 +118,36 @@ namespace TwitchStreamsRecorder
                 var writer = FfmpegProc.StandardInput;
                 var stdin = writer.BaseStream;
 
-                FfmpegProc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.WriteLine(e.Data); };
+                var progressRegex = new Regex(@"^frame=\s*\d+", RegexOptions.Compiled);
+
+                int lastProgressLen = 0;
+                bool lastWasProgress = false;
+
+                FfmpegProc.ErrorDataReceived += (s, e) => 
+                {
+                    if (string.IsNullOrEmpty(e.Data)) return;
+
+                    if (progressRegex.IsMatch(e.Data))
+                    {
+                        var text = e.Data.TrimEnd();
+                        var pad = new string(' ', Math.Max(0, lastProgressLen - text.Length));
+
+                        Console.Write($"\r[ffmpeg]: {text}{pad}");
+                        lastProgressLen = text.Length;
+                        lastWasProgress = true;
+                    }
+                    else
+                    {
+                        if (lastWasProgress)
+                        {
+                            Console.WriteLine();
+                            lastWasProgress = false;
+                            lastProgressLen = 0;
+                        }
+
+                        Console.WriteLine("[ffmpeg]: " + e.Data);
+                    }
+                };
                 FfmpegProc.BeginErrorReadLine();
 
                 _log.Information("ffmpeg успешно запущен.");
@@ -145,6 +159,8 @@ namespace TwitchStreamsRecorder
                     if (currentBufferFile is null && _bufferFilesQueue.IsCompleted)
                     {
                         await FfmpegProc.WaitForExitAsync(cts);
+
+                        Console.WriteLine();
 
                         isReadyToUpload = true;
 
@@ -252,13 +268,11 @@ namespace TwitchStreamsRecorder
                 var ffmpegPsi = new ProcessStartInfo
                 {
                     FileName = "ffmpeg",
-                    RedirectStandardInput = true,
                     UseShellExecute = false,
                     RedirectStandardOutput = false,
                     RedirectStandardError = true,
                     CreateNoWindow = true
                 };
-
 
                 ffmpegPsi.ArgumentList.Add("-y");
                 ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add($"{buff}");
@@ -290,10 +304,55 @@ namespace TwitchStreamsRecorder
                     _log.Fatal($"Запуск ffmpeg для перекодирования в 720p для файла {buff} не удался.");
                     return;
                 }
-                
-                FfmpegProc720!.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.WriteLine(e.Data); };
+
+                var progressRegex = new Regex(@"frame=\s*\d+.*time=(?<time>\d{2}:\d{2}:\d{2}\.\d+).*speed=\s*(?<speed>[\d\.]+)x", RegexOptions.Compiled);
+
+                int lastProgressLen = 0;
+                bool lastWasProgress = false;
+                double lastPercent = 0;
+
+                // где-нибудь до цикла
+                double fileDurationSec = await TelegramChannelService.GetDurationSeconds(buff);   // у вас этот метод уже есть
+
+                FfmpegProc720!.ErrorDataReceived += (s, e) => 
+                {
+                    if (string.IsNullOrEmpty(e.Data)) return;
+
+                    var m = progressRegex.Match(e.Data);
+
+                    if (m.Success)
+                    {
+                        var t = TimeSpan.Parse(m.Groups["time"].Value);
+                        var speed = double.Parse(m.Groups["speed"].Value, CultureInfo.InvariantCulture);
+
+                        var doneSec = t.TotalSeconds;
+                        var percent = Math.Min(100, doneSec / fileDurationSec * 100);
+
+                        var etaSec = (fileDurationSec - doneSec) / Math.Max(speed, 0.01);
+                        var eta = TimeSpan.FromSeconds(etaSec);
+
+                        var text = $"[ffmpeg] {percent,6:0.0}% | ETA {eta:hh\\:mm\\:ss} | {e.Data.Trim()}";
+                        var pad = new string(' ', Math.Max(0, lastProgressLen - text.Length));
+
+                        Console.Write($"\r[ffmpeg]: {text}{pad}");
+                        lastProgressLen = text.Length;
+                        lastWasProgress = true;
+                        lastPercent = percent;
+                    }
+                    else
+                    {
+                        if (lastWasProgress)
+                        {
+                            Console.WriteLine();
+                            lastWasProgress = false;
+                            lastProgressLen = 0;
+                        }
+
+                        Console.WriteLine("[ffmpeg]: " + e.Data);
+                    }
+                };
                 FfmpegProc720.BeginErrorReadLine();
-                
+
                 _log.Information($"ffmpeg для перекодирования в 720p для файла {buff} успешно запущен.");
                 
                 try
@@ -338,8 +397,6 @@ namespace TwitchStreamsRecorder
         private async Task FastStartPassAsync(string dir, CancellationToken cts)
         {
             _log.Information("Запуск процесса сдвига метаданных перекодированных фрагментов для возможности потокового воспроизведения...");
-
-            //Path.GetFileNameWithoutExtension(dir);
 
             foreach (var tmp in Directory.EnumerateFiles(dir, "*.temp.mp4", SearchOption.TopDirectoryOnly))
             {

@@ -97,10 +97,10 @@ namespace TwitchStreamsRecorder
                     StartWritingFragmentsToBufferAsync(StreamlinkProc.StandardOutput.BaseStream, bufferFile, cts).ContinueWith(t =>
                         {
                             if (t.Exception != null)
-                                Console.Error.WriteLine(t.Exception);
+                                Console.Error.WriteLine("[Pending buffer copies]: " + t.Exception);
                         }, cts));
 
-                StreamlinkProc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.Error.WriteLine(e.Data); };
+                StreamlinkProc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.Error.WriteLine("[streamlink]: " + e.Data); };
                 StreamlinkProc.BeginErrorReadLine();
 
                 await StreamlinkProc.WaitForExitAsync(cts);

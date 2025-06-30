@@ -16,7 +16,7 @@ namespace TwitchStreamsRecorder
                 .Enrich.WithProperty("Channel", "-")         
                 .Enrich.WithProperty("Source", "Main")       
                 .Enrich.FromLogContext()                     
-                .WriteTo.Console(outputTemplate: Template)
+                .WriteTo.Console(outputTemplate: Template, restrictedToMinimumLevel: LogEventLevel.Verbose)
 
                 .WriteTo.Sink(new TelegramSink(bot, tgChatId),
                               restrictedToMinimumLevel: LogEventLevel.Error)
