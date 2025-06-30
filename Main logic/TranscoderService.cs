@@ -311,8 +311,7 @@ namespace TwitchStreamsRecorder
                 bool lastWasProgress = false;
                 double lastPercent = 0;
 
-                // где-нибудь до цикла
-                double fileDurationSec = await TelegramChannelService.GetDurationSeconds(buff);   // у вас этот метод уже есть
+                double fileDurationSec = await TelegramChannelService.GetDurationSeconds(buff);
 
                 FfmpegProc720!.ErrorDataReceived += (s, e) => 
                 {

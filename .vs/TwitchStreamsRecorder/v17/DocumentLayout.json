@@ -3,16 +3,16 @@
   "WorkspaceRootPath": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\telegram logic\\headlinetelegrammessagebuilder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:telegram logic\\headlinetelegrammessagebuilder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\main logic\\transcoderservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:main logic\\transcoderservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\telegram logic\\telegramchannelservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:telegram logic\\telegramchannelservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\main logic\\transcoderservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:main logic\\transcoderservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\telegram logic\\headlinetelegrammessagebuilder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|solutionrelative:telegram logic\\headlinetelegrammessagebuilder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{71298133-5E88-462C-AB58-7D191A1798D2}|TwitchStreamsRecorder.csproj|c:\\users\\sosit\\documents\\c#\\twitchstreamsrecorder\\cleaners\\emptydirectorycleaner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -86,7 +86,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 18,
+          "SelectedChildIndex": 6,
           "Children": [
             {
               "$type": "Document",
@@ -99,8 +99,7 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAABAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-05-31T22:20:06.411Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
@@ -113,8 +112,7 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAACQAAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-01T20:00:25.985Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
@@ -127,8 +125,7 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAACiAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-01T00:36:00.985Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
@@ -141,8 +138,7 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAAA1AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-01T20:26:04.309Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
@@ -155,8 +151,7 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-01T20:10:47.758Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
@@ -169,18 +164,17 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAFgAAAARAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-01T00:31:54.545Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 0,
               "Title": "TranscoderService.cs",
               "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Main logic\\TranscoderService.cs",
               "RelativeDocumentMoniker": "Main logic\\TranscoderService.cs",
               "ToolTip": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Main logic\\TranscoderService.cs",
               "RelativeToolTip": "Main logic\\TranscoderService.cs",
-              "ViewState": "AgIAADcBAAAAAAAAAAAmwPYAAAAMAAAAAAAAAA==",
+              "ViewState": "AgIAACoBAAAAAAAAAAAWwDgBAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-01T00:32:09.557Z",
               "IsPinned": true,
@@ -197,8 +191,7 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABkAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-12T19:13:26.939Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
@@ -211,8 +204,7 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABYAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-12T19:10:29.811Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
@@ -225,8 +217,7 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAG0AAAASAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-12T19:36:56.015Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
@@ -239,12 +230,24 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAABAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-14T22:22:51.578Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{eefa5220-e298-11d0-8f78-00a0c9110057}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "HeadlineTelegramMessageBuilder.cs",
+              "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Telegram logic\\HeadlineTelegramMessageBuilder.cs",
+              "RelativeDocumentMoniker": "Telegram logic\\HeadlineTelegramMessageBuilder.cs",
+              "ToolTip": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Telegram logic\\HeadlineTelegramMessageBuilder.cs",
+              "RelativeToolTip": "Telegram logic\\HeadlineTelegramMessageBuilder.cs",
+              "ViewState": "AgIAABkAAAAAAAAAAAAcwA0AAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-06-30T05:31:40.647Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -254,7 +257,7 @@
               "RelativeDocumentMoniker": "Telegram logic\\TelegramChannelService.cs",
               "ToolTip": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Telegram logic\\TelegramChannelService.cs",
               "RelativeToolTip": "Telegram logic\\TelegramChannelService.cs",
-              "ViewState": "AgIAAIEBAAAAAAAAAAAmwAYAAAAZAAAAAAAAAA==",
+              "ViewState": "AgIAAF0CAAAAAAAAAAAuwGgCAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-06-12T19:22:03.483Z",
               "EditorCaption": ""
@@ -269,8 +272,7 @@
               "RelativeToolTip": "Cleaners\\Result720CleanerService.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAwAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-26T06:12:44.812Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-26T06:12:44.812Z"
             },
             {
               "$type": "Document",
@@ -282,8 +284,7 @@
               "RelativeToolTip": "Cleaners\\DiskSpaceGuard.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-16T23:33:00.802Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-16T23:33:00.802Z"
             },
             {
               "$type": "Document",
@@ -295,8 +296,7 @@
               "RelativeToolTip": "Cleaners\\ResultCleanerService.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAADkAAAAVAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-14T00:22:27.197Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-14T00:22:27.197Z"
             },
             {
               "$type": "Document",
@@ -308,8 +308,7 @@
               "RelativeToolTip": "Cleaners\\BufferCleanerService.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAmAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-14T00:05:13.616Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-14T00:05:13.616Z"
             },
             {
               "$type": "Document",
@@ -321,21 +320,7 @@
               "RelativeToolTip": "Cleaners\\EmptyDirectoryCleaner.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABYAAABAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-14T00:55:42.868Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "HeadlineTelegramMessageBuilder.cs",
-              "DocumentMoniker": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Telegram logic\\HeadlineTelegramMessageBuilder.cs",
-              "RelativeDocumentMoniker": "Telegram logic\\HeadlineTelegramMessageBuilder.cs",
-              "ToolTip": "C:\\Users\\sosit\\Documents\\c#\\TwitchStreamsRecorder\\Telegram logic\\HeadlineTelegramMessageBuilder.cs",
-              "RelativeToolTip": "Telegram logic\\HeadlineTelegramMessageBuilder.cs",
-              "ViewState": "AgIAAGYAAAAAAAAAAAAmwH0AAAARAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-30T05:31:40.647Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-14T00:55:42.868Z"
             },
             {
               "$type": "Document",
@@ -347,8 +332,7 @@
               "RelativeToolTip": "Telegram logic\\ThumbnailGenerator.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAACgAAAAxAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-30T06:58:28.894Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-06-30T06:58:28.894Z"
             }
           ]
         }

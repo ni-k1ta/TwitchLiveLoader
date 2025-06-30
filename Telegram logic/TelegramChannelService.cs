@@ -612,7 +612,7 @@ namespace TwitchStreamsRecorder
         public static async Task<int> GetDurationSeconds(string videoFile)
         {
             var mediaInfo = await FFProbe.AnalyseAsync(videoFile);
-            return (int)(Math.Round(mediaInfo.Duration.TotalSeconds));
+            return (int)Math.Round(mediaInfo.Duration.TotalSeconds);
         }
 
         private async Task<WTelegram.Types.Message[]> Retry(Func<Task<WTelegram.Types.Message[]>> action, CancellationToken ct, int max = 10)
