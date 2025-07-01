@@ -11,14 +11,16 @@ internal sealed class LogCleanerService(string directory,
     private readonly TimeSpan _retention = retention; 
     private readonly ILogger _log = logger.ForContext("Source", "LogCleaner");
     private readonly CancellationToken _ct = ct;
+    private TimeSpan _timer;
 
     public Task RunAsync() => Task.Run(LoopAsync, _ct);
 
     private async Task LoopAsync()
     {
-        _log.Debug("Запуск мониторинга устаревших лог файлов.");
-
         var timer = new PeriodicTimer(TimeSpan.FromHours(24) + TimeSpan.FromMinutes(5));
+        _timer = TimeSpan.FromHours(24) + TimeSpan.FromMinutes(5);
+
+        _log.Debug($"Запуск мониторинга устаревших лог файлов (периодичность: {_timer}; срок хранения: {_retention}).");
 
         while (await timer.WaitForNextTickAsync(_ct))
         {
@@ -43,7 +45,7 @@ internal sealed class LogCleanerService(string directory,
 
             var info = new FileInfo(file);
 
-            var age = DateTime.Now - info.LastWriteTimeUtc;
+            var age = DateTime.UtcNow - info.LastWriteTimeUtc;
             if (age < _retention) continue;
 
             try
@@ -63,8 +65,8 @@ internal sealed class LogCleanerService(string directory,
         }
 
         if (removed > 0)
-            _log.Information($"Сканирование лог файлов завершено. Удалено {removed} файлов.");
+            _log.Information($"Сканирование лог файлов завершено. Удалено {removed} файлов. Следующее сканирование через {_timer} в {(DateTime.UtcNow + _timer).ToLocalTime()}.");
         else
-            _log.Information("Сканирование лог файлов завершено. Не найдено файлов с истёкшым сроком хранения.");
+            _log.Information($"Сканирование лог файлов завершено. Не найдено файлов с истёкшым сроком хранения. Следующее сканирование через {_timer} в {(DateTime.UtcNow + _timer).ToLocalTime()}.");
     }
 }

@@ -6,6 +6,7 @@ using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using TL;
+using TwitchStreamsRecorder.Helpers;
 using TwitchStreamsRecorder.Network_logic;
 using TwitchStreamsRecorder.Telegram_logic;
 using WTelegram;
@@ -289,7 +290,7 @@ namespace TwitchStreamsRecorder
 
                         var thumb = await _thumbnailGenerator.GenerateAsync(file, new ThumbnailOptions(Seek: TimeSpan.FromSeconds(2)), cts);
 
-                        var duration = await GetDurationSeconds(file);
+                        var duration = await GetDurationSeconds(file, cts);
 
                         var fs = File.OpenRead(file);
                         var thumbStream = File.OpenRead(thumb);
@@ -468,7 +469,7 @@ namespace TwitchStreamsRecorder
                     {
                         var thumb = await _thumbnailGenerator.GenerateAsync(file, new ThumbnailOptions(Seek: TimeSpan.FromSeconds(2)), cts);
 
-                        var duration = await GetDurationSeconds(file);
+                        var duration = await GetDurationSeconds(file, cts);
 
                         var fs = File.OpenRead(file);
                         var thumbStream = File.OpenRead(thumb);
@@ -609,7 +610,7 @@ namespace TwitchStreamsRecorder
             _streamInfo.Categories.Clear();
         }
 
-        public static async Task<int> GetDurationSeconds(string videoFile)
+        public static async Task<int> GetDurationSeconds(string videoFile, CancellationToken cts)
         {
             var mediaInfo = await FFProbe.AnalyseAsync(videoFile);
             return (int)Math.Round(mediaInfo.Duration.TotalSeconds);

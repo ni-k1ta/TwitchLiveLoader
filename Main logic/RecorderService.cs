@@ -1,6 +1,7 @@
 ﻿using Serilog;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using TwitchStreamsRecorder.Helpers;
 
 namespace TwitchStreamsRecorder
 {
@@ -10,14 +11,20 @@ namespace TwitchStreamsRecorder
         private int _bufferSize;
         private BlockingCollection<string>? _bufferFilesQueue;
         private ConcurrentQueue<Task>? _pendingBufferCopies;
-        private Process? _streamlinkProc;
 
+        private Process? _streamlinkProc;
         public Process? StreamlinkProc { get => _streamlinkProc; set => _streamlinkProc = value; }
 
         private readonly ILogger _log = log.ForContext("Source", "Recorder");
 
         DiskSpaceGuard? _diskGuard = null;
 
+        public void SetBufferQueue(BlockingCollection<string> bufferFilesQueue, int bufferSize, ConcurrentQueue<Task> tasks)
+        {
+            _bufferFilesQueue = bufferFilesQueue;
+            _bufferSize = bufferSize;
+            _pendingBufferCopies = tasks;
+        }
         private string PrepareToRecording(string recordBufferDirectory)
         {
             var bufferFile = Path.Combine(recordBufferDirectory, $"buffer{_bufferFileIndex++}.ts");
@@ -32,6 +39,8 @@ namespace TwitchStreamsRecorder
                 throw new InvalidOperationException($"[{DateTime.Now:HH:mm:ss}] Buffer queue is not set. Call SetBufferQueue() first.");
 
             if (StreamlinkProc is { HasExited: false }) return;
+
+            await using var gateToken = await Globals.StreamlinkGate.AcquireAsync(cts);
 
             var bufferDir = DirectoriesManager.CreateRecordBufferDirectory(pathForRecordBuffer);
 
@@ -150,12 +159,6 @@ namespace TwitchStreamsRecorder
 
             _bufferFileIndex = 0;
             StreamlinkProc = null;
-        }
-        public void SetBufferQueue(BlockingCollection<string> bufferFilesQueue, int bufferSize, ConcurrentQueue<Task> tasks)
-        {
-            _bufferFilesQueue = bufferFilesQueue;
-            _bufferSize = bufferSize;
-            _pendingBufferCopies = tasks;
         }
         private Task StartWritingFragmentsToBufferAsync(Stream stdout, string bufferFile, CancellationToken cts)
         {

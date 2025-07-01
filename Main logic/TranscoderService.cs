@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using TwitchStreamsRecorder.Helpers;
 
 namespace TwitchStreamsRecorder
 {
@@ -18,9 +19,92 @@ namespace TwitchStreamsRecorder
 
         private readonly ILogger _log = logger.ForContext("Source", "Transcoder");
 
+        private enum TranscodeQuality { Original, p720 }
+
+        public void SetBufferQueue(BlockingCollection<string> bufferFilesQueue, int bufferSize)
+        {
+            _bufferFilesQueue = bufferFilesQueue;
+            _bufferSize = bufferSize;
+        }
         private string PrepareToTranscoding(string transcodeResultDirectory)
         {
             return Path.Combine(transcodeResultDirectory, $"rec{_outputFileIndex++}_%Y-%m-%d_%H-%M-%S.temp.mp4");
+        }
+        private static (int, int) GetVideoRes(string mp4)
+        {
+            using var info = TagLib.File.Create(mp4);
+            return (info.Properties.VideoWidth, info.Properties.VideoHeight);
+        }
+        private string[] BuildArgs(string input, string output, TranscodeQuality quality)
+        {
+            var args = new List<string>
+            {
+                "-y"
+            };
+
+            if (quality == TranscodeQuality.Original)
+            {
+                if (OperatingSystem.IsWindows())
+                {
+                    args.AddRange
+                        (
+                        [
+                            "-hwaccel",                 "qsv",
+                            "-hwaccel_output_format",   "qsv",
+                            "-extra_hw_frames",         "64",
+                            "-i",                       input,
+                            "-c:v",                     "hevc_qsv",
+                            "-preset",                  "1",
+                            "-global_quality",          "20"
+                        ]
+                        );
+                }
+                else
+                {
+                    args.AddRange
+                        (
+                        [
+                            "-i",       input,
+                            "-c:v",     "libx264",
+                            "-preset",  "veryslow",
+                            "-crf",     "20"
+                        ]
+                        );
+                }
+            }
+
+            if (quality == TranscodeQuality.p720)
+            {
+                args.AddRange
+                    (
+                    [
+                        "-i",       input,
+                        "-vf",      "scale=-2:720",
+                        "-c:v",     "libx264",
+                        "-preset",  "veryslow",
+                        "-crf",     "20"
+                    ]
+                    );
+            }
+
+            args.AddRange
+                (
+                [
+                    "-c:a",                 "copy",
+                    "-f",                   "segment",
+                    "-segment_time",        "30",
+                    "-reset_timestamps",    "1",
+                    "-segment_format",      "mp4",
+                    "-strftime",            "1"
+                ]
+                );
+
+            if (quality == TranscodeQuality.p720)
+                args.AddRange(["-movflags", "+faststart"]);
+
+            args.Add(output);
+
+            return args.ToArray();
         }
         public async Task StartTranscoding(string pathForOutputResult, TelegramChannelService tgChannel, CancellationToken cts)
         {
@@ -71,33 +155,11 @@ namespace TwitchStreamsRecorder
                     CreateNoWindow = true
                 };
 
+                var args = BuildArgs("pipe:0", outFile, TranscodeQuality.Original);
 
-                ffmpegPsi.ArgumentList.Add("-y");
-                if (OperatingSystem.IsWindows())
-                {
-                    ffmpegPsi.ArgumentList.Add("-hwaccel"); ffmpegPsi.ArgumentList.Add("qsv");
-                    ffmpegPsi.ArgumentList.Add("-hwaccel_output_format"); ffmpegPsi.ArgumentList.Add("qsv");
-                    ffmpegPsi.ArgumentList.Add("-extra_hw_frames"); ffmpegPsi.ArgumentList.Add("64");
-                    ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
-                    ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("hevc_qsv");
-                    ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("1");
-                    ffmpegPsi.ArgumentList.Add("-global_quality"); ffmpegPsi.ArgumentList.Add("20");
-                }
-                else
-                {
-                    ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add("pipe:0");
-                    ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
-                    ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("veryslow");
-                    ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("20");
-                }
-                ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
-                ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
-                ffmpegPsi.ArgumentList.Add("-segment_time"); ffmpegPsi.ArgumentList.Add("3600");
-                ffmpegPsi.ArgumentList.Add("-reset_timestamps"); ffmpegPsi.ArgumentList.Add("1");
-                ffmpegPsi.ArgumentList.Add("-segment_format"); ffmpegPsi.ArgumentList.Add("mp4");
-                ffmpegPsi.ArgumentList.Add("-strftime"); ffmpegPsi.ArgumentList.Add("1");
-                ffmpegPsi.ArgumentList.Add(outFile);
+                foreach (var arg in args) ffmpegPsi.ArgumentList.Add(arg);
 
+                await using var gateToken = await Globals.FfmpegGate.AcquireAsync(cts);   // ← блокирует, если идёт apt-upgrade
 
                 try
                 {
@@ -208,7 +270,7 @@ namespace TwitchStreamsRecorder
                 {
                     await FastStartPassAsync(resultDir, cts);
                 }
-                catch (ThreadStateException)
+                catch (Exception ex) when (ex is ThreadStateException or AggregateException)
                 {
                     return;
                 }
@@ -224,6 +286,8 @@ namespace TwitchStreamsRecorder
                 {
                     (int width, int height) = GetVideoRes(testVideo);
 
+                    _ = tgChannel.SendFinalStreamVOD(videosList, width, height, cts);
+
                     if (height > 720)
                     {
                         _ = StartTranscoding720(finalDir, tgChannel, cts);
@@ -232,254 +296,8 @@ namespace TwitchStreamsRecorder
                     {
                         _log.Error("Качество оригинальной записи <= 720p => не будет запущено перекодирование в более сжатое качество, но это не учтено при формировании заглавного сообщения в канал. Требуется ручное редактирование сообщения.");
                     }
-
-                    await tgChannel.SendFinalStreamVOD(videosList, width, height, cts);
                 }
             }
-        }
-        private static (int, int) GetVideoRes(string mp4)
-        {
-            using var info = TagLib.File.Create(mp4);
-            return (info.Properties.VideoWidth, info.Properties.VideoHeight);
-        }
-        public async Task StartTranscoding720(string pathForOutputResult, TelegramChannelService tgChannel, CancellationToken cts)
-        {
-            if (FfmpegProc720 is not null && !FfmpegProc720.HasExited)
-                return;
-
-            var parentDir = Path.GetDirectoryName(pathForOutputResult);
-            var currBuffDir = Directory.GetDirectories(parentDir!, "buffer_*").OrderByDescending(Path.GetFileName).FirstOrDefault();
-
-            string resultDir = Path.Combine(pathForOutputResult, "720p");
-            Directory.CreateDirectory(resultDir);
-
-            var filesCount = Directory.EnumerateFiles(currBuffDir!, "*.ts", SearchOption.TopDirectoryOnly).Count();
-
-            int i = 0;
-
-            foreach (var buff in Directory.EnumerateFiles(currBuffDir!, "*.ts", SearchOption.TopDirectoryOnly))
-            {
-                i++;
-
-                var outFile = Path.Combine(resultDir, "720rec_%Y-%m-%d_%H-%M-%S.mp4");
-
-                _log.Information($"Запуск ffmpeg для перкодирования в 720p для файла {buff} ({i} из {filesCount})...");
-
-                var ffmpegPsi = new ProcessStartInfo
-                {
-                    FileName = "ffmpeg",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = false,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                };
-
-                ffmpegPsi.ArgumentList.Add("-y");
-                ffmpegPsi.ArgumentList.Add("-i"); ffmpegPsi.ArgumentList.Add($"{buff}");
-                ffmpegPsi.ArgumentList.Add("-vf"); ffmpegPsi.ArgumentList.Add("scale=-2:720");
-                ffmpegPsi.ArgumentList.Add("-c:v"); ffmpegPsi.ArgumentList.Add("libx264");
-                ffmpegPsi.ArgumentList.Add("-preset"); ffmpegPsi.ArgumentList.Add("veryslow");
-                ffmpegPsi.ArgumentList.Add("-crf"); ffmpegPsi.ArgumentList.Add("20");
-                ffmpegPsi.ArgumentList.Add("-c:a"); ffmpegPsi.ArgumentList.Add("copy");
-                ffmpegPsi.ArgumentList.Add("-f"); ffmpegPsi.ArgumentList.Add("segment");
-                ffmpegPsi.ArgumentList.Add("-segment_time"); ffmpegPsi.ArgumentList.Add("3600");
-                ffmpegPsi.ArgumentList.Add("-reset_timestamps"); ffmpegPsi.ArgumentList.Add("1");
-                ffmpegPsi.ArgumentList.Add("-segment_format"); ffmpegPsi.ArgumentList.Add("mp4");
-                ffmpegPsi.ArgumentList.Add("-strftime"); ffmpegPsi.ArgumentList.Add("1");
-                ffmpegPsi.ArgumentList.Add("-movflags"); ffmpegPsi.ArgumentList.Add("+faststart");
-                ffmpegPsi.ArgumentList.Add(outFile);
-
-                try
-                {
-                    FfmpegProc720 = Process.Start(ffmpegPsi);
-                }
-                catch (Exception ex)
-                {
-                    _log.Fatal(ex, $"Запуск ffmpeg для перекодирования в 720p для файла {buff} не удался. Ошибка:");
-                    return;
-                }
-                
-                if (FfmpegProc720 is null)
-                {
-                    _log.Fatal($"Запуск ffmpeg для перекодирования в 720p для файла {buff} не удался.");
-                    return;
-                }
-
-                var progressRegex = new Regex(@"frame=\s*\d+.*time=(?<time>\d{2}:\d{2}:\d{2}\.\d+).*speed=\s*(?<speed>[\d\.]+)x", RegexOptions.Compiled);
-
-                int lastProgressLen = 0;
-                bool lastWasProgress = false;
-                double lastPercent = 0;
-
-                double fileDurationSec = await TelegramChannelService.GetDurationSeconds(buff);
-
-                FfmpegProc720!.ErrorDataReceived += (s, e) => 
-                {
-                    if (string.IsNullOrEmpty(e.Data)) return;
-
-                    var m = progressRegex.Match(e.Data);
-
-                    if (m.Success)
-                    {
-                        var t = TimeSpan.Parse(m.Groups["time"].Value);
-                        var speed = double.Parse(m.Groups["speed"].Value, CultureInfo.InvariantCulture);
-
-                        var doneSec = t.TotalSeconds;
-                        var percent = Math.Min(100, doneSec / fileDurationSec * 100);
-
-                        var etaSec = (fileDurationSec - doneSec) / Math.Max(speed, 0.01);
-                        var eta = TimeSpan.FromSeconds(etaSec);
-
-                        var text = $"[ffmpeg] {percent,6:0.0}% | ETA {eta:hh\\:mm\\:ss} | {e.Data.Trim()}";
-                        var pad = new string(' ', Math.Max(0, lastProgressLen - text.Length));
-
-                        Console.Write($"\r[ffmpeg]: {text}{pad}");
-                        lastProgressLen = text.Length;
-                        lastWasProgress = true;
-                        lastPercent = percent;
-                    }
-                    else
-                    {
-                        if (lastWasProgress)
-                        {
-                            Console.WriteLine();
-                            lastWasProgress = false;
-                            lastProgressLen = 0;
-                        }
-
-                        Console.WriteLine("[ffmpeg]: " + e.Data);
-                    }
-                };
-                FfmpegProc720.BeginErrorReadLine();
-
-                _log.Information($"ffmpeg для перекодирования в 720p для файла {buff} успешно запущен.");
-                
-                try
-                {
-                    await FfmpegProc720.WaitForExitAsync(cts);
-                }
-                catch (Exception ex)
-                {
-                    _log.Error(ex, $"Неожиданное завершение ffmpeg при попытке перекодирования файла {buff} в 720p. Оставшиеся файлы также не будет перекодированы -> никакие фрагменты в 720p не будут загружены в телеграм чат канала. Требуется ручное вмешательство. Файлы, которые были успешно перекодированы, будут удалены через 5 часов. Ошибка:");
-                
-                    return;
-                }
-                finally
-                {
-                    if (FfmpegProc720 != null)
-                    {
-                        if (!FfmpegProc720!.HasExited)
-                        {
-                            try
-                            {
-                                using var to = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                                await FfmpegProc720.WaitForExitAsync(to.Token);
-                            }
-                            catch (OperationCanceledException) { }
-                
-                            if (!FfmpegProc720.HasExited)
-                                    FfmpegProc720.Kill(entireProcessTree: true);
-                        }
-
-                        _log.Warning($"ffmpeg exit code = {FfmpegProc720!.ExitCode}");
-                        FfmpegProc720.Dispose();
-                        FfmpegProc720 = null;
-                    }
-                }
-            }
-
-            await tgChannel.SendFinalStreamVOD720(Directory.GetFiles(resultDir, "*.mp4"), cts);
-
-            Directory.Delete(resultDir, true);
-        }
-
-        private async Task FastStartPassAsync(string dir, CancellationToken cts)
-        {
-            _log.Information("Запуск процесса сдвига метаданных перекодированных фрагментов для возможности потокового воспроизведения...");
-
-            foreach (var tmp in Directory.EnumerateFiles(dir, "*.temp.mp4", SearchOption.TopDirectoryOnly))
-            {
-                var src = tmp.Replace(".temp.mp4", ".mp4");
-
-                _log.Information($"Запуск ffmpeg для файла {tmp} для копирования и сдвига метаданных...");
-
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "ffmpeg",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = false,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                };
-
-                psi.ArgumentList.Add("-y");
-                psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(tmp);
-                psi.ArgumentList.Add("-c"); psi.ArgumentList.Add("copy");
-                psi.ArgumentList.Add("-movflags"); psi.ArgumentList.Add("+faststart");
-                psi.ArgumentList.Add(src);
-
-                Process? proc = null;
-
-                try
-                {
-                    proc = Process.Start(psi)!;
-
-                    if (proc is null)
-                    {
-                        _log.Fatal($"Запуск ffmpeg при попытке сдвинуть метаданные для файла {tmp} не удался. Требуется ручное вмешательство. Дальнейшее выполнение остановлено -> записи не будут выгружены в телеграм канал.");
-                        throw new ThreadStateException();
-                    }
-
-                    proc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.WriteLine(e.Data); };
-                    proc.BeginErrorReadLine();
-
-                    _log.Information($"ffmpeg для сдвига метаданных для файла {tmp} успешно запущен.");
-
-                    await proc.WaitForExitAsync(cts);
-
-                    if (proc.ExitCode != 0)
-                    {
-                        _log.Error($"Возможно ошибка при попытке сдвига метаданных для файла {tmp}, ffmpeg завершился с кодом: {proc.ExitCode}. Вероятно требуется ручное вмешательство. На всякий случай temp файл не будет сейчас удалён для дальнейшей диагностики, но процесс не остановлен -> в телеграм будет загружен возможно повреждённый файл {src}.");
-                    }
-                    else
-                    {
-                        _log.Information($"ffmpeg успешно сдвинул метаданные. Старый файл {tmp} будет удалён, его копия со сдвинутыми метаданными теперь в файле {src}.");
-                        File.Delete(tmp);
-                    }
-                }
-                catch (OperationCanceledException) { throw new ThreadStateException(); }
-                catch (ThreadStateException) { throw new ThreadStateException(); }
-                catch (Exception ex)
-                {
-                    _log.Fatal(ex, $"Запуск ffmpeg при попытке сдвинуть метаданные для файла {tmp} не удался. Дальнейшее выполнение остановлено -> записи не будут выгружены в телеграм канал. Ошибка:");
-                    throw new ThreadStateException();
-                }
-                finally
-                {
-                    proc?.Dispose();
-                    proc = null;
-                }
-            }
-            _log.Information("Процесс сдвига метаданных перекодированных фрагментов для возможности потокового воспроизведения завершён для всех фрагментов.");
-        }
-
-        public async Task ResetAsync(CancellationToken cts)
-        {
-            if (FfmpegProc != null)
-            {
-                await FfmpegProc!.WaitForExitAsync(cts);
-
-                try { FfmpegProc!.StandardInput.Close(); }
-                catch { }
-            }
-                
-            _outputFileIndex = 0;
-            FfmpegProc = null;
-        }
-        public void SetBufferQueue(BlockingCollection<string> bufferFilesQueue, int bufferSize)
-        {
-            _bufferFilesQueue = bufferFilesQueue;
-            _bufferSize = bufferSize;
         }
         private async Task<(string? bufferFile, long readPos)> StartStreamFragmentsFromBufferAsync(Stream stdIn, StreamWriter writer, string? bufferFile, long readPos, CancellationToken cts)
         {
@@ -549,6 +367,325 @@ namespace TwitchStreamsRecorder
             writer.Close();
             stdIn.Close();
             return (null, 0);
+        }
+        public async Task StartTranscoding720(string pathForOutputResult, TelegramChannelService tgChannel, CancellationToken cts)
+        {
+            if (FfmpegProc720 is not null && !FfmpegProc720.HasExited)
+                return;
+
+            var parentDir = Path.GetDirectoryName(pathForOutputResult);
+            var currBuffDir = Directory.GetDirectories(parentDir!, "buffer_*").OrderByDescending(Path.GetFileName).FirstOrDefault();
+
+            string resultDir = Path.Combine(pathForOutputResult, "720p");
+            Directory.CreateDirectory(resultDir);
+
+            var filesCount = Directory.EnumerateFiles(currBuffDir!, "*.ts", SearchOption.TopDirectoryOnly).Count();
+
+            int i = 0;
+
+            foreach (var buff in Directory.EnumerateFiles(currBuffDir!, "*.ts", SearchOption.TopDirectoryOnly))
+            {
+                var gateToken = await Globals.FfmpegGate.AcquireAsync(cts);
+
+                i++;
+
+                var outFile = Path.Combine(resultDir, "720rec_%Y-%m-%d_%H-%M-%S.mp4");
+
+                _log.Information($"Запуск ffmpeg для перкодирования в 720p для файла {buff} ({i} из {filesCount})...");
+
+                var ffmpegPsi = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                var args = BuildArgs(buff, outFile, TranscodeQuality.p720);
+
+                foreach (var arg in args) ffmpegPsi.ArgumentList.Add(arg);
+
+                try
+                {
+                    FfmpegProc720 = Process.Start(ffmpegPsi);
+                }
+                catch (Exception ex)
+                {
+                    await gateToken.DisposeAsync();
+                    _log.Fatal(ex, $"Запуск ffmpeg для перекодирования в 720p для файла {buff} не удался. Ошибка:");
+                    return;
+                }
+
+                if (FfmpegProc720 is null)
+                {
+                    await gateToken.DisposeAsync();
+                    _log.Fatal($"Запуск ffmpeg для перекодирования в 720p для файла {buff} не удался.");
+                    return;
+                }
+
+                var progressRegex = new Regex(@"frame=\s*\d+.*time=(?<time>\d{2}:\d{2}:\d{2}\.\d+).*speed=\s*(?<speed>[\d\.]+)x", RegexOptions.Compiled);
+
+                int lastProgressLen = 0;
+                bool lastWasProgress = false;
+                double lastPercent = 0;
+
+                double fileDurationSec = await TelegramChannelService.GetDurationSeconds(buff, cts);
+
+                FfmpegProc720!.ErrorDataReceived += (s, e) =>
+                {
+                    if (string.IsNullOrEmpty(e.Data)) return;
+
+                    var m = progressRegex.Match(e.Data);
+
+                    if (m.Success)
+                    {
+                        var t = TimeSpan.Parse(m.Groups["time"].Value);
+                        var speed = double.Parse(m.Groups["speed"].Value, CultureInfo.InvariantCulture);
+
+                        var doneSec = t.TotalSeconds;
+                        var percent = Math.Min(100, doneSec / fileDurationSec * 100);
+
+                        var etaSec = (fileDurationSec - doneSec) / Math.Max(speed, 0.01);
+                        var eta = TimeSpan.FromSeconds(etaSec);
+
+                        var text = $"[ffmpeg] {percent,6:0.0}% | ETA {eta:hh\\:mm\\:ss} | {e.Data.Trim()}";
+                        var pad = new string(' ', Math.Max(0, lastProgressLen - text.Length));
+
+                        Console.Write($"\r[ffmpeg]: {text}{pad}");
+                        lastProgressLen = text.Length;
+                        lastWasProgress = true;
+                        lastPercent = percent;
+                    }
+                    else
+                    {
+                        if (lastWasProgress)
+                        {
+                            Console.WriteLine();
+                            lastWasProgress = false;
+                            lastProgressLen = 0;
+                        }
+
+                        Console.WriteLine("[ffmpeg]: " + e.Data);
+                    }
+                };
+                FfmpegProc720.BeginErrorReadLine();
+
+                _log.Information($"ffmpeg для перекодирования в 720p для файла {buff} успешно запущен.");
+
+                try
+                {
+                    await FfmpegProc720.WaitForExitAsync(cts);
+                }
+                catch (Exception ex)
+                {
+                    _log.Error(ex, $"Неожиданное завершение ffmpeg при попытке перекодирования файла {buff} в 720p. Оставшиеся файлы также не будет перекодированы -> никакие фрагменты в 720p не будут загружены в телеграм чат канала. Требуется ручное вмешательство. Файлы, которые были успешно перекодированы, будут удалены через 5 часов. Ошибка:");
+
+                    return;
+                }
+                finally
+                {
+                    if (FfmpegProc720 != null)
+                    {
+                        if (!FfmpegProc720!.HasExited)
+                        {
+                            try
+                            {
+                                using var to = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                                await FfmpegProc720.WaitForExitAsync(to.Token);
+                            }
+                            catch (OperationCanceledException) { }
+
+                            if (!FfmpegProc720.HasExited)
+                                FfmpegProc720.Kill(entireProcessTree: true);
+                        }
+
+                        _log.Warning($"ffmpeg exit code = {FfmpegProc720!.ExitCode}");
+                        FfmpegProc720.Dispose();
+                        FfmpegProc720 = null;
+                    }
+                    await gateToken.DisposeAsync();
+                }
+            }
+
+            await tgChannel.SendFinalStreamVOD720(Directory.GetFiles(resultDir, "*.mp4"), cts);
+
+            Directory.Delete(resultDir, true);
+        }
+        private async Task FastStartPassAsync(string dir, CancellationToken cts)
+        {
+            await using var gateToken = await Globals.FfmpegGate.AcquireAsync(cts);
+
+            _log.Information("Запуск процесса сдвига метаданных перекодированных фрагментов для возможности потокового воспроизведения...");
+
+            var maxDegree = Math.Max(1, Environment.ProcessorCount);
+            using var limiter = new SemaphoreSlim(maxDegree);
+
+            var tasks = new List<Task>();
+
+            foreach (var tmp in Directory.EnumerateFiles(dir, "*.temp.mp4", SearchOption.TopDirectoryOnly))
+            {
+                await limiter.WaitAsync(cts);
+
+                tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        var src = tmp.Replace(".temp.mp4", ".mp4");
+
+                        _log.Information($"Запуск ffmpeg для файла {tmp} для копирования и сдвига метаданных...");
+
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = "ffmpeg",
+                            UseShellExecute = false,
+                            RedirectStandardOutput = false,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        };
+
+                        psi.ArgumentList.Add("-y");
+                        psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(tmp);
+                        psi.ArgumentList.Add("-c"); psi.ArgumentList.Add("copy");
+                        psi.ArgumentList.Add("-movflags"); psi.ArgumentList.Add("+faststart");
+                        psi.ArgumentList.Add(src);
+
+                        Process? proc = null;
+
+                        try
+                        {
+                            proc = Process.Start(psi)!;
+
+                            if (proc is null)
+                            {
+                                _log.Fatal($"Запуск ffmpeg при попытке сдвинуть метаданные для файла {tmp} не удался. Требуется ручное вмешательство. Дальнейшее выполнение остановлено -> записи не будут выгружены в телеграм канал.");
+                                throw new ThreadStateException();
+                            }
+
+                            proc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.WriteLine(e.Data); };
+                            proc.BeginErrorReadLine();
+
+                            _log.Information($"ffmpeg для сдвига метаданных для файла {tmp} успешно запущен.");
+
+                            await proc.WaitForExitAsync(cts);
+
+                            if (proc.ExitCode != 0)
+                            {
+                                _log.Error($"Возможно ошибка при попытке сдвига метаданных для файла {tmp}, ffmpeg завершился с кодом: {proc.ExitCode}. Вероятно требуется ручное вмешательство. На всякий случай temp файл не будет сейчас удалён для дальнейшей диагностики, но процесс не остановлен -> в телеграм будет загружен возможно повреждённый файл {src}.");
+                            }
+                            else
+                            {
+                                _log.Information($"ffmpeg успешно сдвинул метаданные. Старый файл {tmp} будет удалён, его копия со сдвинутыми метаданными теперь в файле {src}.");
+                                File.Delete(tmp);
+                            }
+                        }
+                        catch (OperationCanceledException) { throw new ThreadStateException(); }
+                        catch (ThreadStateException) { throw; }
+                        catch (Exception ex)
+                        {
+                            _log.Fatal(ex, $"Запуск ffmpeg при попытке сдвинуть метаданные для файла {tmp} не удался. Дальнейшее выполнение остановлено -> записи не будут выгружены в телеграм канал. Ошибка:");
+                            throw new ThreadStateException();
+                        }
+                        finally
+                        {
+                            proc?.Dispose();
+                            proc = null;
+                        }
+                    }
+                    catch (Exception) { throw; }
+                    finally
+                    {
+                        limiter.Release();
+                    }
+                }, cts));
+            }
+
+            await Task.WhenAll(tasks);
+            _log.Information("Процесс сдвига метаданных перекодированных фрагментов для возможности потокового воспроизведения завершён для всех фрагментов.");
+        }
+        //private async Task FastStartPassAsync(string dir, CancellationToken cts)
+        //{
+        //    await using var gateToken = await Globals.Gate.AcquireAsync(cts);
+
+        //    _log.Information("Запуск процесса сдвига метаданных перекодированных фрагментов для возможности потокового воспроизведения...");
+
+        //    foreach (var tmp in Directory.EnumerateFiles(dir, "*.temp.mp4", SearchOption.TopDirectoryOnly))
+        //    {
+        //        var src = tmp.Replace(".temp.mp4", ".mp4");
+
+        //        _log.Information($"Запуск ffmpeg для файла {tmp} для копирования и сдвига метаданных...");
+
+        //        var psi = new ProcessStartInfo
+        //        {
+        //            FileName = "ffmpeg",
+        //            UseShellExecute = false,
+        //            RedirectStandardOutput = false,
+        //            RedirectStandardError = true,
+        //            CreateNoWindow = true
+        //        };
+
+        //        psi.ArgumentList.Add("-y");
+        //        psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(tmp);
+        //        psi.ArgumentList.Add("-c"); psi.ArgumentList.Add("copy");
+        //        psi.ArgumentList.Add("-movflags"); psi.ArgumentList.Add("+faststart");
+        //        psi.ArgumentList.Add(src);
+
+        //        Process? proc = null;
+
+        //        try
+        //        {
+        //            proc = Process.Start(psi)!;
+
+        //            if (proc is null)
+        //            {
+        //                _log.Fatal($"Запуск ffmpeg при попытке сдвинуть метаданные для файла {tmp} не удался. Требуется ручное вмешательство. Дальнейшее выполнение остановлено -> записи не будут выгружены в телеграм канал.");
+        //                throw new ThreadStateException();
+        //            }
+
+        //            proc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.WriteLine(e.Data); };
+        //            proc.BeginErrorReadLine();
+
+        //            _log.Information($"ffmpeg для сдвига метаданных для файла {tmp} успешно запущен.");
+
+        //            await proc.WaitForExitAsync(cts);
+
+        //            if (proc.ExitCode != 0)
+        //            {
+        //                _log.Error($"Возможно ошибка при попытке сдвига метаданных для файла {tmp}, ffmpeg завершился с кодом: {proc.ExitCode}. Вероятно требуется ручное вмешательство. На всякий случай temp файл не будет сейчас удалён для дальнейшей диагностики, но процесс не остановлен -> в телеграм будет загружен возможно повреждённый файл {src}.");
+        //            }
+        //            else
+        //            {
+        //                _log.Information($"ffmpeg успешно сдвинул метаданные. Старый файл {tmp} будет удалён, его копия со сдвинутыми метаданными теперь в файле {src}.");
+        //                File.Delete(tmp);
+        //            }
+        //        }
+        //        catch (OperationCanceledException) { throw new ThreadStateException(); }
+        //        catch (ThreadStateException) { throw new ThreadStateException(); }
+        //        catch (Exception ex)
+        //        {
+        //            _log.Fatal(ex, $"Запуск ffmpeg при попытке сдвинуть метаданные для файла {tmp} не удался. Дальнейшее выполнение остановлено -> записи не будут выгружены в телеграм канал. Ошибка:");
+        //            throw new ThreadStateException();
+        //        }
+        //        finally
+        //        {
+        //            proc?.Dispose();
+        //            proc = null;
+        //        }
+        //    }
+        //    _log.Information("Процесс сдвига метаданных перекодированных фрагментов для возможности потокового воспроизведения завершён для всех фрагментов.");
+        //}
+        public async Task ResetAsync(CancellationToken cts)
+        {
+            if (FfmpegProc != null)
+            {
+                await FfmpegProc!.WaitForExitAsync(cts);
+
+                try { FfmpegProc!.StandardInput.Close(); }
+                catch { }
+            }
+                
+            _outputFileIndex = 0;
+            FfmpegProc = null;
         }
         private string? FinalizeOutputFolder(string transcodeResultDirectory)
         {

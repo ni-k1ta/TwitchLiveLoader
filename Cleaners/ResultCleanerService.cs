@@ -8,6 +8,7 @@ namespace TwitchStreamsRecorder
         private readonly TimeSpan _retention;    
         private readonly ILogger _log;
         private readonly CancellationToken _stop;
+        private TimeSpan _timer;
 
         public ResultCleanerService(string root,
                                     TimeSpan retention,
@@ -19,9 +20,10 @@ namespace TwitchStreamsRecorder
 
         private async Task LoopAsync()
         {
-            _log.Debug("Запуск мониторинга директорий с обработанными результатами в 1080p.");
-
             var timer = new PeriodicTimer(TimeSpan.FromHours(24) + TimeSpan.FromSeconds(10));
+            _timer = TimeSpan.FromHours(24) + TimeSpan.FromSeconds(10);
+
+            _log.Debug($"Запуск мониторинга директорий с обработанными результатами в 1080p (периодичность: {_timer}; срок хранения: {_retention}).");
 
             while (await timer.WaitForNextTickAsync(_stop))
             {
@@ -45,7 +47,7 @@ namespace TwitchStreamsRecorder
                 {
                     var info = new DirectoryInfo(resDir);
 
-                    var age = DateTime.Now - info.LastWriteTimeUtc;
+                    var age = DateTime.UtcNow - info.LastWriteTimeUtc;
                     if (age < _retention) continue;
 
                     try
@@ -62,9 +64,9 @@ namespace TwitchStreamsRecorder
             }
 
             if (removed > 0)
-                _log.Information($"Сканирование директорий с обработанными результатами в 1080p завершено. Удалено {removed} директорий.");
+                _log.Information($"Сканирование директорий с обработанными результатами в 1080p завершено. Удалено {removed} директорий. Следующее сканирование через {_timer} в {(DateTime.UtcNow + _timer).ToLocalTime()}.");
             else
-                _log.Information("Сканирование директорий с обработанными результатами в 1080p завершено. Не найдено директорий с истёкшым сроком хранения.");
+                _log.Information($"Сканирование директорий с обработанными результатами в 1080p завершено. Не найдено директорий с истёкшым сроком хранения. Следующее сканирование через {_timer} в {(DateTime.UtcNow + _timer).ToLocalTime()}.");
         }
     }
 }

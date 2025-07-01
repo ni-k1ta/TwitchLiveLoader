@@ -9,6 +9,8 @@ namespace TwitchStreamsRecorder
         private readonly ILogger _log;
         private readonly CancellationToken _stop;
 
+        private TimeSpan _timer;
+
         public BufferCleanerService(string root,
                                     TimeSpan retention,
                                     ILogger logger,
@@ -19,9 +21,10 @@ namespace TwitchStreamsRecorder
 
         private async Task LoopAsync()
         {
-            _log.Debug("Запуск мониторинга буффер директорий.");
+            var timer = new PeriodicTimer(TimeSpan.FromHours(24));
+            _timer = TimeSpan.FromHours(24);
 
-            var timer = new PeriodicTimer(TimeSpan.FromHours(24)); 
+            _log.Debug($"Запуск мониторинга буффер директорий (периодичность: {_timer}; срок хранения: {_retention}).");
 
             while (await timer.WaitForNextTickAsync(_stop))
             {
@@ -45,7 +48,7 @@ namespace TwitchStreamsRecorder
                 {
                     var info = new DirectoryInfo(bufDir);
 
-                    var age = DateTime.Now - info.LastWriteTimeUtc;
+                    var age = DateTime.UtcNow - info.LastWriteTimeUtc;
                     if (age < _retention) continue;
 
                     try
@@ -62,9 +65,9 @@ namespace TwitchStreamsRecorder
             }
 
             if (removed > 0)
-                _log.Information($"Сканирование буффер директорий завершено. Удалено {removed} директорий.");
+                _log.Information($"Сканирование буффер директорий завершено. Удалено {removed} директорий. Следующее сканирование через {_timer} в {(DateTime.UtcNow + _timer).ToLocalTime()}.");
             else
-                _log.Information("Сканирование буффер директорий завершено. Не найдено директорий с истёкшым сроком хранения.");
+                _log.Information($"Сканирование буффер директорий завершено. Не найдено директорий с истёкшым сроком хранения. Следующее сканирование через {_timer} в {(DateTime.UtcNow + _timer).ToLocalTime()}.");
         }
     }
 }

@@ -25,6 +25,7 @@ using TwitchLib.Api;
 using TwitchLib.EventSub.Websockets;
 using TwitchLib.EventSub.Websockets.Core.EventArgs.Channel;
 using TwitchStreamsRecorder;
+using TwitchStreamsRecorder.Helpers;
 
 internal class Program
 {
@@ -47,10 +48,40 @@ internal class Program
 
     private static ILogger? _log;
 
-
     private static async Task Main()
     {
-        Console.WriteLine("Twitch auto‑recorder starting…\n");
+        Console.WriteLine("Twitch auto‑recorder starting...\n");
+
+        var json = new ConfigService();
+        var config = json.LoadConfig(Path.Combine(AppContext.BaseDirectory, "recorder.json"));
+        var tgBot = new TelegramBotClient(config.TelegramBotToken);
+        Log.Logger = Logging.InitRoot(tgBot, 448442642);
+
+        var channelPath = Path.Combine(AppContext.BaseDirectory,
+                                       $"{config.ChannelLogin}_.log");
+
+        var channelLogger = new LoggerConfiguration()
+            .MinimumLevel.ControlledBy(Logging.Level)
+            .WriteTo.Logger(Log.Logger)
+            .WriteTo.File(channelPath,
+                          rollingInterval: RollingInterval.Day,
+                          outputTemplate: Logging.Template)
+            .CreateLogger()
+            .ForContext("Channel", config.ChannelLogin);
+
+        _log = channelLogger;
+
+        var deps = new AdditionalProgramsCheckerService(
+              _log,
+              Globals.FfmpegGate,
+              Globals.StreamlinkGate,
+              _cts.Token);
+
+        try
+        {
+            await deps.EnsureToolsInstalledAsync();
+        }
+        catch (Exception ex) { Console.Error.WriteLine(ex); return; }
 
         var bufferFilesQueue = new BlockingCollection<string>();
         var pendingBufferCopies = new ConcurrentQueue<Task>();
@@ -58,29 +89,8 @@ internal class Program
         Task? recordingTask = null;
         Task? transcodingTask = null;
 
-        var json = new ConfigService();
-
-        var config  = json.LoadConfig(Path.Combine(AppContext.BaseDirectory, "recorder.json"));
         var twitchLink = $"twitch.tv/{config.ChannelLogin}";
         var bufferSize = 512 * 1024;
-
-        var tgBot = new TelegramBotClient(config.TelegramBotToken);
-
-        Log.Logger = Logging.InitRoot(tgBot, 448442642);
-
-        var channelPath = Path.Combine(AppContext.BaseDirectory,
-                                       $"{config.ChannelLogin}_.log");
-
-        var channelLogger = new LoggerConfiguration()
-            .MinimumLevel.ControlledBy(Logging.Level)          
-            .WriteTo.Logger(Log.Logger)                        
-            .WriteTo.File(channelPath,
-                          rollingInterval: RollingInterval.Day,
-                          outputTemplate: Logging.Template)
-            .CreateLogger()
-            .ForContext("Channel", config.ChannelLogin);       
-
-        _log = channelLogger;
 
         var recorder = new RecorderService(_log);
         var transcoder = new TranscoderService(_log);
@@ -211,8 +221,6 @@ internal class Program
 
             _ws.ChannelUpdate -= _channelUpdHandler;
             _channelUpdHandler = null;
-
-            //await tgChannel.FinalizeStreamOnlineMsg(_cts.Token);
         };
 
         await _ws.ConnectAsync();
@@ -236,7 +244,7 @@ internal class Program
 
         var result720Cleaner = new Result720CleanerService(
                  root: AppContext.BaseDirectory,
-                 retention: TimeSpan.FromHours(5),
+                 retention: TimeSpan.FromHours(10),
                  logger: _log,
                  stop: _cts.Token);
         _ = result720Cleaner.RunAsync();
@@ -247,16 +255,30 @@ internal class Program
         var logCleaner = new LogCleanerService(AppContext.BaseDirectory, "*.log", TimeSpan.FromDays(10), _log, _cts.Token);
         _ = logCleaner.RunAsync();
 
+        var ffmpegUpdater = new FfmpegUpdater(
+                 gate: Globals.FfmpegGate,
+                 checkEvery: TimeSpan.FromDays(14),
+                 retryDelay: TimeSpan.FromHours(5),
+                 log: _log,
+                 ct: _cts.Token);
+
+        _ = ffmpegUpdater.RunAsync();
+
+        var streamlinkUpdater = new StreamlinkUpdater(
+                            gate: Globals.StreamlinkGate,
+                            checkEvery: TimeSpan.FromDays(14),
+                            retryDelay: TimeSpan.FromHours(5),
+                            log: _log,
+                            ct: _cts.Token,
+                            usePip: false);
+
+        _ = streamlinkUpdater.RunAsync();
+
         Console.CancelKeyPress += (_, e) =>
         {
             e.Cancel = true;
             Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder, eventSubscribe, token, json, tgChannel);
         };
-        //AppDomain.CurrentDomain.ProcessExit += (_, __) =>
-        //{
-        //    Shutdown(bufferFilesQueue, pendingBufferCopies, recordingTask, transcodingTask!, recorder, transcoder, eventSubscribe, token, json);
-        //    _shutdownDone.Wait(TimeSpan.FromSeconds(10));
-        //};
 
         _shutdownDone.Wait();
     }
@@ -276,7 +298,6 @@ internal class Program
 
                 bufferFilesQueue.CompleteAdding();
 
-                //await Task.WhenAll([.. pendingBufferCopies]);
                 while (pendingBufferCopies.TryDequeue(out var t))
                     await Safe(t);
 
