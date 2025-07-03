@@ -3,3 +3,6 @@ bin/
 obj/
 *.log
 *.db
+/vs/
+*.json
+.gitignore
