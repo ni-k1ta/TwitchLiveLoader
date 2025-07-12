@@ -6,7 +6,6 @@ using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using TL;
-using TwitchStreamsRecorder.Helpers;
 using TwitchStreamsRecorder.Network_logic;
 using TwitchStreamsRecorder.Telegram_logic;
 using WTelegram;
@@ -81,7 +80,26 @@ namespace TwitchStreamsRecorder
             };
 
             _bot = new Bot(TgConfig, _db);
+            _bot.Client.WithUpdateManager(OnUpdate);
             _thumbnailGenerator = new(logger);
+        }
+        public async Task BotLoginAsync() => await _bot.Client.LoginBotIfNeeded();
+        private async Task OnUpdate(TL.Update upd)
+        {
+            if (upd is UpdateNewChannelMessage { message: MessageService svc })
+                await TryDeleteIfJoinAsync(svc);
+        }
+
+        private async Task TryDeleteIfJoinAsync(MessageService svc)
+        {
+            if (svc.action is MessageActionChatAddUser or
+                             MessageActionChatJoinedByLink or
+                             MessageActionChatJoinedByRequest or
+                             MessageActionChatDeleteUser)
+            {
+                var chat = await _bot.GetChat(_tgChannelChatId);
+                await _bot.DeleteMessages(chat, svc.ID);
+            }
         }
 
         public async Task SendStreamOnlineMsg(string title, string category, CancellationToken cts)
@@ -649,5 +667,6 @@ namespace TwitchStreamsRecorder
             _bot.Dispose();
             await _db.DisposeAsync();
         }
+        
     }
 }

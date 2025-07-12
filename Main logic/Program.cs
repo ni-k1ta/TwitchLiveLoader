@@ -36,8 +36,8 @@ internal class Program
     private static volatile bool _isLive;
     private static readonly CancellationTokenSource _cts = new();
 
-    static readonly ManualResetEventSlim _shutdownDone = new();
-    static int _shutdownStarted;              
+    private static readonly ManualResetEventSlim _shutdownDone = new();
+    private static int _shutdownStarted;              
 
     public static bool IsLive { get => _isLive; set => _isLive = value; }
 
@@ -125,6 +125,7 @@ internal class Program
         var eventSubscribe = new TwitchEventSubscribeManager(api, _ws, config, channelId, _log);
 
         await using var tgChannel = new TelegramChannelService(config.TelegramChannelId, config.TelegramChannelChatId, tgBot, 27680895, "8f219bef3d3da075c59e3084c7c0134c", _log);
+        await tgChannel.BotLoginAsync();
 
         var result720Cleaner = new Result720CleanerService(
                  root: AppContext.BaseDirectory,

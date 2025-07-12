@@ -91,12 +91,14 @@ namespace TwitchStreamsRecorder
                 catch (Exception ex)
                 {
                     _log.Fatal(ex, "Запуск Streamlink не удался. Ошибка:");
+                    _diskGuard?.Dispose();
                     return;
                 }
                 
                 if (StreamlinkProc is null)
                 {
                     _log.Fatal("Запуск Streamlink не удался.");
+                    _diskGuard?.Dispose();
                     return;
                 }
 
