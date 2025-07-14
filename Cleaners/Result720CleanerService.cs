@@ -85,7 +85,7 @@ namespace TwitchStreamsRecorder
             using var timer = new PeriodicTimer(TimeSpan.FromHours(5));
             _timer = TimeSpan.FromHours(5);
 
-            _log.Debug($"Запуск мониторинга директорий с обработанными результатами в 720p (периодичность: {_timer}; срок хранения: {_retention}).");
+            _log.Information($"Запуск мониторинга директорий с обработанными результатами в 720p (периодичность: {_timer}; срок хранения: {_retention}).");
 
             while (await timer.WaitForNextTickAsync(ct))
             {

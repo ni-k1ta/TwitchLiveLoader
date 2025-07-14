@@ -31,7 +31,8 @@ namespace TwitchStreamsRecorder
 
         private readonly ConcurrentDictionary<int, TaskCompletionSource<int>> _rootMsgIds = new();
         private int _maxBatch = 0;
-        int _lastPin = -1;
+        private int _lastPin = -1;
+
         private TaskCompletionSource<int> GetTcs(int batchNo) =>_rootMsgIds.GetOrAdd(batchNo, _ => new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously));
 
         public TelegramChannelService(string channelId, string channeChatId, TelegramBotClient tgBot, int apiId, string apiHash, ILogger logger)
