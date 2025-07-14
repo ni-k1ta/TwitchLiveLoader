@@ -69,6 +69,7 @@ internal class Program
             .ForContext("Channel", config.ChannelLogin);
 
         _log = channelLogger;
+        _log.Information("Инициализация и запуск всех внутренних сервисов...");
 
         var deps = new AdditionalProgramsCheckerService(
               _log,
@@ -124,7 +125,7 @@ internal class Program
         var eventSubscribe = new TwitchEventSubscribeManager(api, _ws, config, channelId, _log);
 
         await using var tgChannel = new TelegramChannelService(config.TelegramChannelId, config.TelegramChannelChatId, tgBot, 27680895, "8f219bef3d3da075c59e3084c7c0134c", _log);
-        await tgChannel.BotLoginAsync();
+        await tgChannel.BotLoginAsync(); // нужно для активации принятия событий (обновлений) _bot.Client.WithUpdateManager(OnUpdate); - таким образом автоматически удаляются сервисные сообщения в тг чате канала о добавлении\удалении новых участников
 
         var result720Cleaner = new Result720CleanerService(
                  root: AppContext.BaseDirectory,
