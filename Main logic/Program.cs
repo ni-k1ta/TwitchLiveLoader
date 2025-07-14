@@ -13,7 +13,6 @@
   "UserToken":     "eyJh…",          // access_token (может устареть)
   "RefreshToken":  "eyJy…",          // refresh_token (долго живёт)
   "ChannelLogin":  "lirik",
-  "OutputDir":     ""               // если пусто → создаём YYYY‑MM‑DD рядом с exe
 }
 */
 
@@ -241,7 +240,7 @@ internal class Program
                  stop: _cts.Token);
         _ = bufferCleaner.RunAsync();
 
-        var resultCleaner = new ResultCleanerService(
+        var resultCleaner = new Result1080CleanerService(
                  root: AppContext.BaseDirectory,
                  retention: TimeSpan.FromDays(14),
                  logger: _log,

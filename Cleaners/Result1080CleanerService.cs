@@ -2,7 +2,7 @@
 
 namespace TwitchStreamsRecorder
 {
-    internal class ResultCleanerService
+    internal class Result1080CleanerService
     {
         private readonly string _root;          
         private readonly TimeSpan _retention;    
@@ -10,11 +10,11 @@ namespace TwitchStreamsRecorder
         private readonly CancellationToken _stop;
         private TimeSpan _timer;
 
-        public ResultCleanerService(string root,
+        public Result1080CleanerService(string root,
                                     TimeSpan retention,
                                     ILogger logger,
                                     CancellationToken stop)
-            => (_root, _retention, _log, _stop) = (root, retention, logger.ForContext("Source", "ResultCleaner"), stop);
+            => (_root, _retention, _log, _stop) = (root, retention, logger.ForContext("Source", "Result1080Cleaner"), stop);
 
         public Task RunAsync() => Task.Run(LoopAsync);     
 
