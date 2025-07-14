@@ -87,15 +87,11 @@ namespace TwitchStreamsRecorder
         private async Task OnUpdate(TL.Update upd)
         {
             if (upd is UpdateNewChannelMessage { message: MessageService svc })
-                await TryDeleteIfJoinAsync(svc);
+                await TryDeleteIfJoinOrLeaveAsync(svc);
         }
-
-        private async Task TryDeleteIfJoinAsync(MessageService svc)
+        private async Task TryDeleteIfJoinOrLeaveAsync(MessageService svc)
         {
-            if (svc.action is MessageActionChatAddUser or
-                             MessageActionChatJoinedByLink or
-                             MessageActionChatJoinedByRequest or
-                             MessageActionChatDeleteUser)
+            if (svc.action is MessageActionChatAddUser or MessageActionChatJoinedByLink or MessageActionChatJoinedByRequest or MessageActionChatDeleteUser)
             {
                 var chat = await _bot.GetChat(_tgChannelChatId);
                 await _bot.DeleteMessages(chat, svc.ID);
@@ -375,7 +371,7 @@ namespace TwitchStreamsRecorder
 
                             i++;
                             await Task.Delay(TimeSpan.FromSeconds(3), cts);
-                            chat = await _bot.GetChat(_tgChannelChatId);
+                            chat = await _bot.GetChat(_tgChannelChatId); //это здесь надо, т.к. информация не обновляется в объекте чата в реальном времени, требуется пересоздавать объект заново.
                             message = chat.PinnedMessage;
                         }
 
