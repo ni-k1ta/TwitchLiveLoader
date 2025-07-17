@@ -32,6 +32,7 @@ namespace TwitchStreamsRecorder
         private readonly ConcurrentDictionary<int, TaskCompletionSource<int>> _rootMsgIds = new();
         private int _maxBatch = 0;
         private int _lastPin = -1;
+        private readonly UpdateManager? _manager;
 
         private TaskCompletionSource<int> GetTcs(int batchNo) =>_rootMsgIds.GetOrAdd(batchNo, _ => new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously));
 
@@ -50,7 +51,10 @@ namespace TwitchStreamsRecorder
                 switch (lvl)
                 {
                     //case 1: _log.Debug(txt); break;
-                    case 2: _log.Information(txt); break;
+                    case 2:
+                        if (!txt.StartsWith("Got Updates_State")) _log.Information(txt);
+                        else Console.WriteLine(txt);
+                        break;
                     case 3: _log.Warning(txt); break;
                     case 4: _log.Error(txt); break;
                     case 5: _log.Fatal(txt); break;
@@ -81,7 +85,12 @@ namespace TwitchStreamsRecorder
             };
 
             _bot = new Bot(TgConfig, _db);
-            _bot.Client.WithUpdateManager(OnUpdate);
+            
+            
+            _bot.Client.PingInterval = 300;
+            _manager = _bot.Client.WithUpdateManager(OnUpdate, "Updates.state");
+            _manager.InactivityThreshold = TimeSpan.FromMinutes(60);
+
             _thumbnailGenerator = new(logger);
         }
         public async Task BotLoginAsync() => await _bot.Client.LoginBotIfNeeded();
@@ -663,6 +672,7 @@ namespace TwitchStreamsRecorder
         {
             _bot.Dispose();
             await _db.DisposeAsync();
+            _manager?.SaveState("Updates.state");
         }
         
     }

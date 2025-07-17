@@ -33,6 +33,26 @@ namespace TwitchStreamsRecorder
 
             return bufferFile;
         }
+        private string[] BuildArgs(string output, string retryStreams, string retryMax, string retryOpen, string streamSegmentAttempts, string streamSegmentThreads, string streamTimeout, string hlsPlaylistReloadAttempts, string defaultStream, string OAuthToken, string twitchChannelLink)
+        {
+            var args = new List<string>
+            {
+                output,
+                "--twitch-disable-ads",
+                "--retry-streams",                  retryStreams,
+                "--retry-max",                      retryMax,
+                "--retry-open",                     retryOpen,
+                "--stream-segment-attempts",        streamSegmentAttempts,
+                "--stream-segment-threads",         Environment.ProcessorCount.ToString(),
+                "--stream-timeout",                 streamTimeout,
+                "--hls-playlist-reload-attempts",   hlsPlaylistReloadAttempts,
+                "--default-stream",                 defaultStream,
+                "--twitch-api-header",              $"Authorization=Bearer {OAuthToken}",
+                twitchChannelLink
+            };
+
+            return args.ToArray();
+        }
         public async Task StartRecording(string twitchChannelLink, string pathForRecordBuffer, TelegramChannelService tgChannel, string OAuthToken, CancellationToken cts)
         {
             if (_bufferFilesQueue is null)
@@ -71,18 +91,9 @@ namespace TwitchStreamsRecorder
                     CreateNoWindow = true
                 };
 
-                streamlinkPsi.ArgumentList.Add("--stdout");
-                streamlinkPsi.ArgumentList.Add("--twitch-disable-ads");
-                streamlinkPsi.ArgumentList.Add("--retry-streams"); streamlinkPsi.ArgumentList.Add("3");
-                streamlinkPsi.ArgumentList.Add("--retry-max"); streamlinkPsi.ArgumentList.Add("3");
-                streamlinkPsi.ArgumentList.Add("--retry-open"); streamlinkPsi.ArgumentList.Add("10");
-                streamlinkPsi.ArgumentList.Add("--stream-segment-attempts"); streamlinkPsi.ArgumentList.Add("10");
-                streamlinkPsi.ArgumentList.Add("--stream-segment-threads"); streamlinkPsi.ArgumentList.Add("2");
-                streamlinkPsi.ArgumentList.Add("--stream-timeout"); streamlinkPsi.ArgumentList.Add("180");
-                streamlinkPsi.ArgumentList.Add("--hls-playlist-reload-attempts"); streamlinkPsi.ArgumentList.Add("10");
-                streamlinkPsi.ArgumentList.Add("--default-stream"); streamlinkPsi.ArgumentList.Add("1080p,best,720p");
-                streamlinkPsi.ArgumentList.Add("--twitch-api-header"); streamlinkPsi.ArgumentList.Add($"Authorization=Bearer {OAuthToken}");
-                streamlinkPsi.ArgumentList.Add(twitchChannelLink);
+                var args = BuildArgs("--stdout", "3", "3", "10", "10", "2", "180", "10", "1080p,best,720p", OAuthToken, twitchChannelLink);
+
+                foreach (var arg in args) streamlinkPsi.ArgumentList.Add(arg);
 
                 try
                 {

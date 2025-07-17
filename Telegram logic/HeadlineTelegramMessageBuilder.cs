@@ -28,9 +28,6 @@ namespace TwitchStreamsRecorder.Network_logic
             ["DA"] = "https://www.donationalerts.com/r/cuuterina"
         };
 
-        /// <summary>
-        /// Формирует пару (текст, entities). При необходимости можно вернуть сразу <see cref="InputMedia"/>.
-        /// </summary>
         public static (string Text, MessageEntity[] Entities) Build(StreamInfo info, SessionStage stage)
         {
             ArgumentNullException.ThrowIfNull(info);

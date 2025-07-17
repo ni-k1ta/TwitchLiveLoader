@@ -65,8 +65,8 @@ internal sealed class LogCleanerService(string directory,
         }
 
         if (removed > 0)
-            _log.Information($"Сканирование лог файлов завершено. Удалено {removed} файлов. Следующее сканирование через {_timer} в {(DateTime.UtcNow + _timer).ToLocalTime().TimeOfDay}.");
+            _log.Information($"Сканирование лог файлов завершено. Удалено {removed} файлов. Следующее сканирование через {_timer} в {(DateTime.UtcNow.Add(_timer)).ToLocalTime().TimeOfDay}.");
         else
-            _log.Information($"Сканирование лог файлов завершено. Не найдено файлов с истёкшым сроком хранения. Следующее сканирование через {_timer} в {(DateTime.UtcNow + _timer).ToLocalTime().TimeOfDay}.");
+            _log.Information($"Сканирование лог файлов завершено. Не найдено файлов с истёкшым сроком хранения. Следующее сканирование через {_timer} в {(DateTime.UtcNow.Add(_timer)).ToLocalTime().TimeOfDay}.");
     }
 }

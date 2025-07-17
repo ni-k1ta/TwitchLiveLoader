@@ -138,9 +138,9 @@ namespace TwitchStreamsRecorder
             }
 
             if (removed > 0)
-                _log.Information($"Сканирование директорий с обработанными результатами в 720p завершено. Удалено {removed} директорий. Следующее сканирование через {_timer} в {(DateTime.UtcNow + _timer).ToLocalTime().TimeOfDay}.");
+                _log.Information($"Сканирование директорий с обработанными результатами в 720p завершено. Удалено {removed} директорий. Следующее сканирование через {_timer} в {(DateTime.UtcNow.Add(_timer)).ToLocalTime().TimeOfDay}.");
             else
-                _log.Information($"Сканирование директорий с обработанными результатами в 720p завершено. Не найдено директорий с истёкшим сроком хранения. Следующее сканирование через {_timer} в {(DateTime.UtcNow + _timer).ToLocalTime().TimeOfDay}.");
+                _log.Information($"Сканирование директорий с обработанными результатами в 720p завершено. Не найдено директорий с истёкшим сроком хранения. Следующее сканирование через {_timer} в {(DateTime.UtcNow.Add(_timer)).ToLocalTime().TimeOfDay}.");
         }
 
         // ------------ IDisposable ------------------------------------------------
