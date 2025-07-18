@@ -17,7 +17,7 @@ namespace TwitchStreamsRecorder.Telegram_logic
         private readonly ILogger _log = logger.ForContext("Source", "ThumbnailGenerator") ?? throw new ArgumentNullException(nameof(logger));
         private readonly string _ffmpegPath = string.IsNullOrWhiteSpace(ffmpegPath) ? "ffmpeg" : ffmpegPath;
 
-        public async Task<string> GenerateAsync(string videoPath, ThumbnailOptions opts, CancellationToken ct)
+        public async Task<string?> GenerateAsync(string videoPath, ThumbnailOptions opts, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(videoPath)) throw new ArgumentException("Value cannot be null or whitespace.", nameof(videoPath));
             if (!File.Exists(videoPath)) throw new FileNotFoundException("Video file not found", videoPath);
@@ -52,8 +52,8 @@ namespace TwitchStreamsRecorder.Telegram_logic
                 if (proc.ExitCode != 0)
                 {
                     var err = await proc.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
-                    _log.Warning("ffmpeg exited with code {Code}. qscale={QScale}. stderr: {Err}", proc.ExitCode, qscale, err);
-                    throw new InvalidOperationException($"ffmpeg exit {proc.ExitCode}: {err}");
+                    _log.Error("ffmpeg exited with code {Code}. qscale={QScale}. stderr: {Err}. У загруженных видео не будет thumbnail - не критично, но нужно проверить в чём проблема.", proc.ExitCode, qscale, err);
+                    return null;
                 }
 
                 var size = new FileInfo(thumbPath).Length;
@@ -67,7 +67,8 @@ namespace TwitchStreamsRecorder.Telegram_logic
                 qscale++;
                 if (qscale > 31)
                 {
-                    throw new InvalidOperationException($"Cannot get thumbnail below {opts.MaxSizeBytes} bytes for '{videoPath}'.");
+                    _log.Error($"Cannot get thumbnail below {opts.MaxSizeBytes} bytes for '{videoPath}'. У загруженных видео не будет thumbnail - не критично, но нужно проверить в чём проблема.");
+                    return null;
                 }
             }
         }

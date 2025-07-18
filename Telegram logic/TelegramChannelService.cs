@@ -107,7 +107,6 @@ namespace TwitchStreamsRecorder
                 await _bot.DeleteMessages(chat, svc.ID);
             }
         }
-
         public async Task SendStreamOnlineMsg(string title, string category, CancellationToken cts)
         {
             _streamInfo.Titles.Add(title);
@@ -168,7 +167,6 @@ namespace TwitchStreamsRecorder
                 }
             }
         }
-
         public async Task UpdateStreamOnlineMsg(string newTitle, string newCategory, CancellationToken cts)
         {
             if (_streamOnlineMsgId == -1)
@@ -289,7 +287,6 @@ namespace TwitchStreamsRecorder
                 }
             }
         }
-
         public async Task SendFinalStreamVOD(IEnumerable<string> VODsFiles, int videoWidth, int videoHeight, CancellationToken cts)
         {
             await _bot.Client.LoginBotIfNeeded();
@@ -317,17 +314,19 @@ namespace TwitchStreamsRecorder
                         var duration = await GetDurationSeconds(file, cts);
 
                         var fs = File.OpenRead(file);
-                        var thumbStream = File.OpenRead(thumb);
+
+                        FileStream? thumbStream = thumb != null ? File.OpenRead(thumb) : null;
 
                         openedStreams.Add(fs);
-                        openedStreams.Add(thumbStream);
+                        if (thumbStream != null)
+                            openedStreams.Add(thumbStream);
 
                         media.Add(new InputMediaVideo(new InputFileStream(fs, Path.GetFileName(file)))
                         {
                             Width = videoWidth,
                             Height = videoHeight,
                             Duration = duration,
-                            Thumbnail = new InputFileStream(thumbStream, Path.GetFileName(thumb)),
+                            Thumbnail = thumbStream != null ? new InputFileStream(thumbStream, Path.GetFileName(thumb)) : null,
                             SupportsStreaming = true
                         });
                     }
@@ -471,7 +470,6 @@ namespace TwitchStreamsRecorder
                 }
             }
         }
-
         public async Task SendFinalStreamVOD720(IEnumerable<string> VODsFiles, CancellationToken cts)
         {
             await _bot.Client.LoginBotIfNeeded();
@@ -496,17 +494,18 @@ namespace TwitchStreamsRecorder
                         var duration = await GetDurationSeconds(file, cts);
 
                         var fs = File.OpenRead(file);
-                        var thumbStream = File.OpenRead(thumb);
+                        FileStream? thumbStream = thumb != null ? File.OpenRead(thumb) : null;
 
                         openedStreams.Add(fs);
-                        openedStreams.Add(thumbStream);
+                        if (thumbStream != null)
+                            openedStreams.Add(thumbStream);
 
                         media.Add(new InputMediaVideo(new InputFileStream(fs, Path.GetFileName(file)))
                         {
                             Width = 1280,
                             Height = 720,
                             Duration = duration,
-                            Thumbnail = new InputFileStream(thumbStream, Path.GetFileName(thumb)),
+                            Thumbnail = thumbStream != null ? new InputFileStream(thumbStream, Path.GetFileName(thumb)) : null,
                             SupportsStreaming = true
                         });
                     }
@@ -633,13 +632,11 @@ namespace TwitchStreamsRecorder
             _streamInfo.Titles.Clear();
             _streamInfo.Categories.Clear();
         }
-
         public static async Task<int> GetDurationSeconds(string videoFile, CancellationToken cts)
         {
             var mediaInfo = await FFProbe.AnalyseAsync(videoFile);
             return (int)Math.Round(mediaInfo.Duration.TotalSeconds);
         }
-
         private async Task<WTelegram.Types.Message[]> Retry(Func<Task<WTelegram.Types.Message[]>> action, CancellationToken ct, int max = 10)
         {
             for (int i = 1; i <= max; i++)
@@ -674,6 +671,5 @@ namespace TwitchStreamsRecorder
             await _db.DisposeAsync();
             _manager?.SaveState("Updates.state");
         }
-        
     }
 }

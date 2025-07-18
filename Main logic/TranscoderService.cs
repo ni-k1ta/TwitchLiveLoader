@@ -18,7 +18,6 @@ namespace TwitchStreamsRecorder
         public Process? FfmpegProc720 { get => _ffmpegProc720; set => _ffmpegProc720 = value; }
 
         private readonly ILogger _log = logger.ForContext("Source", "Transcoder");
-
         private enum TranscodeQuality { Original, p720 }
 
         public void SetBufferQueue(BlockingCollection<string> bufferFilesQueue, int bufferSize)
@@ -605,77 +604,6 @@ namespace TwitchStreamsRecorder
             await Task.WhenAll(tasks);
             _log.Information("Процесс сдвига метаданных перекодированных фрагментов для возможности потокового воспроизведения завершён для всех фрагментов.");
         }
-        //private async Task FastStartPassAsync(string dir, CancellationToken cts)
-        //{
-        //    await using var gateToken = await Globals.Gate.AcquireAsync(cts);
-
-        //    _log.Information("Запуск процесса сдвига метаданных перекодированных фрагментов для возможности потокового воспроизведения...");
-
-        //    foreach (var tmp in Directory.EnumerateFiles(dir, "*.temp.mp4", SearchOption.TopDirectoryOnly))
-        //    {
-        //        var src = tmp.Replace(".temp.mp4", ".mp4");
-
-        //        _log.Information($"Запуск ffmpeg для файла {tmp} для копирования и сдвига метаданных...");
-
-        //        var psi = new ProcessStartInfo
-        //        {
-        //            FileName = "ffmpeg",
-        //            UseShellExecute = false,
-        //            RedirectStandardOutput = false,
-        //            RedirectStandardError = true,
-        //            CreateNoWindow = true
-        //        };
-
-        //        psi.ArgumentList.Add("-y");
-        //        psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(tmp);
-        //        psi.ArgumentList.Add("-c"); psi.ArgumentList.Add("copy");
-        //        psi.ArgumentList.Add("-movflags"); psi.ArgumentList.Add("+faststart");
-        //        psi.ArgumentList.Add(src);
-
-        //        Process? proc = null;
-
-        //        try
-        //        {
-        //            proc = Process.Start(psi)!;
-
-        //            if (proc is null)
-        //            {
-        //                _log.Fatal($"Запуск ffmpeg при попытке сдвинуть метаданные для файла {tmp} не удался. Требуется ручное вмешательство. Дальнейшее выполнение остановлено -> записи не будут выгружены в телеграм канал.");
-        //                throw new ThreadStateException();
-        //            }
-
-        //            proc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.WriteLine(e.Data); };
-        //            proc.BeginErrorReadLine();
-
-        //            _log.Information($"ffmpeg для сдвига метаданных для файла {tmp} успешно запущен.");
-
-        //            await proc.WaitForExitAsync(cts);
-
-        //            if (proc.ExitCode != 0)
-        //            {
-        //                _log.Error($"Возможно ошибка при попытке сдвига метаданных для файла {tmp}, ffmpeg завершился с кодом: {proc.ExitCode}. Вероятно требуется ручное вмешательство. На всякий случай temp файл не будет сейчас удалён для дальнейшей диагностики, но процесс не остановлен -> в телеграм будет загружен возможно повреждённый файл {src}.");
-        //            }
-        //            else
-        //            {
-        //                _log.Information($"ffmpeg успешно сдвинул метаданные. Старый файл {tmp} будет удалён, его копия со сдвинутыми метаданными теперь в файле {src}.");
-        //                File.Delete(tmp);
-        //            }
-        //        }
-        //        catch (OperationCanceledException) { throw new ThreadStateException(); }
-        //        catch (ThreadStateException) { throw new ThreadStateException(); }
-        //        catch (Exception ex)
-        //        {
-        //            _log.Fatal(ex, $"Запуск ffmpeg при попытке сдвинуть метаданные для файла {tmp} не удался. Дальнейшее выполнение остановлено -> записи не будут выгружены в телеграм канал. Ошибка:");
-        //            throw new ThreadStateException();
-        //        }
-        //        finally
-        //        {
-        //            proc?.Dispose();
-        //            proc = null;
-        //        }
-        //    }
-        //    _log.Information("Процесс сдвига метаданных перекодированных фрагментов для возможности потокового воспроизведения завершён для всех фрагментов.");
-        //}
         public async Task ResetAsync(CancellationToken cts)
         {
             if (FfmpegProc != null)
