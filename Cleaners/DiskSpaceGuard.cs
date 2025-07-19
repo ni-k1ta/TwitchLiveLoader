@@ -18,7 +18,7 @@ namespace TwitchStreamsRecorder
 
         private async Task LoopAsync()
         {
-            _log.Information($"Запуск лайв-мониторинга свободного места на диске (минимум = {_minFreeBytes} bytes, периодичность = {_period} мин.");
+            _log.Information($"Запуск лайв-мониторинга свободного места на диске (минимум = {_minFreeBytes} bytes, периодичность = {_period} мин.)");
 
             while (!_cts.IsCancellationRequested)
             {

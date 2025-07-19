@@ -66,7 +66,8 @@ internal class Program
                           rollingInterval: RollingInterval.Day,
                           outputTemplate: Logging.Template)
             .CreateLogger()
-            .ForContext("Channel", config.ChannelLogin);
+            .ForContext("Channel", config.ChannelLogin)
+            .ForContext("Source", "Main");
 
         _log = channelLogger;
         _log.Information("Инициализация и запуск всех внутренних сервисов...");

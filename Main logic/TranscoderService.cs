@@ -65,7 +65,7 @@ namespace TwitchStreamsRecorder
                         [
                             "-i",       input,
                             "-c:v",     "libx264",
-                            "-preset",  "veryslow",
+                            "-preset",  "slow",
                             "-crf",     "20"
                         ]
                         );
@@ -80,7 +80,7 @@ namespace TwitchStreamsRecorder
                         "-i",       input,
                         "-vf",      "scale=-2:720",
                         "-c:v",     "libx264",
-                        "-preset",  "veryslow",
+                        "-preset",  "slow",
                         "-crf",     "20"
                     ]
                     );
@@ -547,6 +547,7 @@ namespace TwitchStreamsRecorder
 
                         psi.ArgumentList.Add("-y");
                         psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(tmp);
+                        psi.ArgumentList.Add("-map"); psi.ArgumentList.Add("0");
                         psi.ArgumentList.Add("-c"); psi.ArgumentList.Add("copy");
                         psi.ArgumentList.Add("-movflags"); psi.ArgumentList.Add("+faststart");
                         psi.ArgumentList.Add(src);
