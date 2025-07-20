@@ -18,7 +18,7 @@ namespace TwitchStreamsRecorder
         public Process? FfmpegProc720 { get => _ffmpegProc720; set => _ffmpegProc720 = value; }
 
         private readonly ILogger _log = logger.ForContext("Source", "Transcoder");
-        private enum TranscodeQuality { Original, p720 }
+        private enum TranscodeMode { Original, p720, FastStart }
 
         public void SetBufferQueue(BlockingCollection<string> bufferFilesQueue, int bufferSize)
         {
@@ -34,14 +34,14 @@ namespace TwitchStreamsRecorder
             using var info = TagLib.File.Create(mp4);
             return (info.Properties.VideoWidth, info.Properties.VideoHeight);
         }
-        private string[] BuildArgs(string input, string output, TranscodeQuality quality)
+        private string[] BuildArgs(string input, string output, TranscodeMode quality)
         {
             var args = new List<string>
             {
                 "-y"
             };
 
-            if (quality == TranscodeQuality.Original)
+            if (quality == TranscodeMode.Original)
             {
                 if (OperatingSystem.IsWindows())
                 {
@@ -66,13 +66,13 @@ namespace TwitchStreamsRecorder
                             "-i",       input,
                             "-c:v",     "libx264",
                             "-preset",  "slow",
-                            "-crf",     "20"
+                            "-crf",     "22"
                         ]
                         );
                 }
             }
 
-            if (quality == TranscodeQuality.p720)
+            if (quality == TranscodeMode.p720)
             {
                 args.AddRange
                     (
@@ -81,24 +81,38 @@ namespace TwitchStreamsRecorder
                         "-vf",      "scale=-2:720",
                         "-c:v",     "libx264",
                         "-preset",  "slow",
-                        "-crf",     "20"
+                        "-crf",     "22"
                     ]
                     );
             }
 
-            args.AddRange
+            if (quality != TranscodeMode.FastStart)
+            {
+                args.AddRange
                 (
                 [
                     "-c:a",                 "copy",
                     "-f",                   "segment",
-                    "-segment_time",        "4500",
+                    "-segment_time",        "4200",
                     "-reset_timestamps",    "1",
                     "-segment_format",      "mp4",
                     "-strftime",            "1"
                 ]
                 );
+            }
+            else
+            {
+                args.AddRange
+                (
+                [
+                    "-i",   input,
+                    "-map", "0",
+                    "-c",   "copy"
+                ]
+                );
+            }
 
-            if (quality == TranscodeQuality.p720)
+            if (quality != TranscodeMode.Original)
                 args.AddRange(["-movflags", "+faststart"]);
 
             args.Add(output);
@@ -154,7 +168,7 @@ namespace TwitchStreamsRecorder
                     CreateNoWindow = true
                 };
 
-                var args = BuildArgs("pipe:0", outFile, TranscodeQuality.Original);
+                var args = BuildArgs("pipe:0", outFile, TranscodeMode.Original);
 
                 foreach (var arg in args) ffmpegPsi.ArgumentList.Add(arg);
 
@@ -401,7 +415,7 @@ namespace TwitchStreamsRecorder
                     CreateNoWindow = true
                 };
 
-                var args = BuildArgs(buff, outFile, TranscodeQuality.p720);
+                var args = BuildArgs(buff, outFile, TranscodeMode.p720);
 
                 foreach (var arg in args) ffmpegPsi.ArgumentList.Add(arg);
 
@@ -545,12 +559,9 @@ namespace TwitchStreamsRecorder
                             CreateNoWindow = true
                         };
 
-                        psi.ArgumentList.Add("-y");
-                        psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(tmp);
-                        psi.ArgumentList.Add("-map"); psi.ArgumentList.Add("0");
-                        psi.ArgumentList.Add("-c"); psi.ArgumentList.Add("copy");
-                        psi.ArgumentList.Add("-movflags"); psi.ArgumentList.Add("+faststart");
-                        psi.ArgumentList.Add(src);
+                        var args = BuildArgs(tmp, src, TranscodeMode.FastStart);
+
+                        foreach (var arg in args) psi.ArgumentList.Add(arg);
 
                         Process? proc = null;
 
