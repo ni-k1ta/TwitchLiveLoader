@@ -65,7 +65,7 @@ namespace TwitchStreamsRecorder
                         [
                             "-i",       input,
                             "-c:v",     "libx264",
-                            "-preset",  "slow",
+                            "-preset",  "medium",
                             "-crf",     "22"
                         ]
                         );
@@ -80,7 +80,7 @@ namespace TwitchStreamsRecorder
                         "-i",       input,
                         "-vf",      "scale=-2:720",
                         "-c:v",     "libx264",
-                        "-preset",  "slow",
+                        "-preset",  "medium",
                         "-crf",     "22"
                     ]
                     );
@@ -93,7 +93,7 @@ namespace TwitchStreamsRecorder
                 [
                     "-c:a",                 "copy",
                     "-f",                   "segment",
-                    "-segment_time",        "4200",
+                    "-segment_time",        "4500",
                     "-reset_timestamps",    "1",
                     "-segment_format",      "mp4",
                     "-strftime",            "1"
