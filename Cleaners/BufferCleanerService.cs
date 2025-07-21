@@ -65,9 +65,9 @@ namespace TwitchStreamsRecorder
             }
 
             if (removed > 0)
-                _log.Information($"Сканирование буффер директорий завершено. Удалено {removed} директорий. Следующее сканирование через {_timer} в {(DateTime.UtcNow.Add(_timer)).ToLocalTime().TimeOfDay}.");
+                _log.Information($"Сканирование буффер директорий завершено. Удалено {removed} директорий. Следующее сканирование через {_timer} в {(DateTime.UtcNow.Add(_timer)).ToLocalTime()}.");
             else
-                _log.Information($"Сканирование буффер директорий завершено. Не найдено директорий с истёкшым сроком хранения. Следующее сканирование через {_timer} в {(DateTime.UtcNow.Add(_timer)).ToLocalTime().TimeOfDay}.");
+                _log.Information($"Сканирование буффер директорий завершено. Не найдено директорий с истёкшым сроком хранения. Следующее сканирование через {_timer} в {(DateTime.UtcNow.Add(_timer)).ToLocalTime()}.");
         }
     }
 }

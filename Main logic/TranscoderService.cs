@@ -130,6 +130,8 @@ namespace TwitchStreamsRecorder
             string? currentBufferFile = null;
             long currentBufferPos = 0;
 
+            await using var gateToken = await Globals.FfmpegGate.AcquireAsync(cts);   // ← блокирует, если идёт apt-upgrade
+
             string resultDir = DirectoriesManager.CreateTranscodeResultDirectory(pathForOutputResult);
 
             var firstFile = _bufferFilesQueue.Take(cts);
@@ -171,8 +173,6 @@ namespace TwitchStreamsRecorder
                 var args = BuildArgs("pipe:0", outFile, TranscodeMode.Original);
 
                 foreach (var arg in args) ffmpegPsi.ArgumentList.Add(arg);
-
-                await using var gateToken = await Globals.FfmpegGate.AcquireAsync(cts);   // ← блокирует, если идёт apt-upgrade
 
                 try
                 {
@@ -303,7 +303,7 @@ namespace TwitchStreamsRecorder
 
                     if (height > 720)
                     {
-                        _ = StartTranscoding720(finalDir, tgChannel, result720Cleaner, cts);
+                        await StartTranscoding720(finalDir, tgChannel, result720Cleaner, cts);
                     }
                     else
                     {
@@ -398,8 +398,6 @@ namespace TwitchStreamsRecorder
 
             foreach (var buff in Directory.EnumerateFiles(currBuffDir!, "*.ts", SearchOption.TopDirectoryOnly))
             {
-                var gateToken = await Globals.FfmpegGate.AcquireAsync(cts);
-
                 i++;
 
                 var outFile = Path.Combine(resultDir, "720rec_%Y-%m-%d_%H-%M-%S.mp4");
@@ -425,14 +423,12 @@ namespace TwitchStreamsRecorder
                 }
                 catch (Exception ex)
                 {
-                    await gateToken.DisposeAsync();
                     _log.Fatal(ex, $"Запуск ffmpeg для перекодирования в 720p для файла {buff} не удался. Ошибка:");
                     return;
                 }
 
                 if (FfmpegProc720 is null)
                 {
-                    await gateToken.DisposeAsync();
                     _log.Fatal($"Запуск ffmpeg для перекодирования в 720p для файла {buff} не удался.");
                     return;
                 }
@@ -517,7 +513,6 @@ namespace TwitchStreamsRecorder
                         FfmpegProc720.Dispose();
                         FfmpegProc720 = null;
                     }
-                    await gateToken.DisposeAsync();
                 }
             }
 
@@ -529,8 +524,6 @@ namespace TwitchStreamsRecorder
         }
         private async Task FastStartPassAsync(string dir, CancellationToken cts)
         {
-            await using var gateToken = await Globals.FfmpegGate.AcquireAsync(cts);
-
             _log.Information("Запуск процесса сдвига метаданных перекодированных фрагментов для возможности потокового воспроизведения...");
 
             var maxDegree = Math.Max(1, Environment.ProcessorCount);

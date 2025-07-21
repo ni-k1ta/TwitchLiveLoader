@@ -1,5 +1,6 @@
 ﻿using FFMpegCore;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Caching.Memory;
 using Serilog;
 using System.Collections.Concurrent;
 using Telegram.Bot;
@@ -21,6 +22,8 @@ namespace TwitchStreamsRecorder
         private readonly string _tgChannelChatId;
         private readonly TelegramBotClient _tgBot;
         private int _streamOnlineMsgId = -1;
+        private WTelegram.Types.Message[]? _1080Msg;
+        private readonly MemoryCache _map = new(new MemoryCacheOptions());
 
         private readonly SqliteConnection _db;
         private readonly Bot _bot;
@@ -98,13 +101,52 @@ namespace TwitchStreamsRecorder
         {
             if (upd is UpdateNewChannelMessage { message: MessageService svc })
                 await TryDeleteIfJoinOrLeaveAsync(svc);
+
+            if (upd is UpdateEditChannelMessage edited)
+                await TryAdd720MediaCaption(edited);
+        }
+        private async Task TryAdd720MediaCaption(UpdateEditChannelMessage edited)
+        {
+            if (_map.TryGetValue(edited.message.ID, out int chatMsgId))
+            {
+                var m = (TL.Message)edited.message;
+
+                var htmlCaption = _bot.Client.EntitiesToHtml(m.message, m.entities);
+
+                try
+                {
+                    await _tgBot.EditMessageCaption
+                    (
+                        chatId: _tgChannelChatId,
+                        messageId: chatMsgId,
+                        caption: htmlCaption,
+                        parseMode: Telegram.Bot.Types.Enums.ParseMode.Html
+                    );
+                }
+                catch (Exception ex)
+                {
+                    _log.Error(ex, $"Не удалось добавить описание для 720p видео в чате канала по ID: {chatMsgId}. Требуется ручное вмешательство. Ошибка:");
+                }
+
+                _log.Information($"Успешное добавление описания для 720p видео в чате канала по ID: {chatMsgId}.");
+            }
         }
         private async Task TryDeleteIfJoinOrLeaveAsync(MessageService svc)
         {
             if (svc.action is MessageActionChatAddUser or MessageActionChatJoinedByLink or MessageActionChatJoinedByRequest or MessageActionChatDeleteUser)
             {
                 var chat = await _bot.GetChat(_tgChannelChatId);
-                await _bot.DeleteMessages(chat, svc.ID);
+
+                try
+                {
+                    await _bot.DeleteMessages(chat, svc.ID);
+                }
+                catch (Exception ex)
+                {
+                    _log.Error(ex, $"Не удалось удалить сервисное сообщение в чате канала о добавлении нового/удалении участника чата. Требуется ручное вмешательство. Ошибка: ");
+                }
+
+                _log.Information("Удаление сервисного сообщения в чате канала о добавлении нового/удалении участника чата прошло успешно.");
             }
         }
         public async Task SendStreamOnlineMsg(string title, string category, CancellationToken cts)
@@ -356,7 +398,7 @@ namespace TwitchStreamsRecorder
 
                     _log.Information($"Начало загрузки перекодированных фрагментов ({videoHeight}p) стрима в телеграм канал {_tgChannelId}...");
 
-                    var msg1080 = await Retry(async () => await _bot.SendMediaGroup(_tgChannelId, media), cts);
+                    _1080Msg = await Retry(async () => await _bot.SendMediaGroup(_tgChannelId, media), cts);
 
                     _log.Information($"Фрагменты перекодированной трансляции ({videoHeight}p) ({offset + media.Count} из {vodFiles.Length}) загружены успешно.");
 
@@ -555,7 +597,7 @@ namespace TwitchStreamsRecorder
                         MessageId = replyTo
                     };
 
-                    var msg720 = await Retry(async () => await _bot.SendMediaGroup
+                    var massage720 = await Retry(async () => await _bot.SendMediaGroup
                         (
                             _tgChannelChatId,
                             media,
@@ -564,6 +606,21 @@ namespace TwitchStreamsRecorder
                         ), cts);
 
                     _log.Information($"Фрагменты перекодированной трансляции (720p) ({offset + media.Count} из {vodFiles.Length}) загружены успешно.");
+
+                    var cacheOptions = new MemoryCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(14)
+                    };
+
+                    foreach (var (msg1080, msg720) in _1080Msg!.Zip(massage720))
+                    {
+                        _map.Set(
+                            key: msg1080.MessageId,   // ID ролика 1080p в канале
+                            value: msg720.MessageId,  // ID соответствующего 720p в обсуждении
+                            options: cacheOptions);
+                    }
+
+                    _log.Information("В памяти сохранены связи между элементами медиа-альбома в 1080p в канале и элементами медиа-альбома в 720p в чате канала для автоматического редиктирования описаний второго при редактированиии описаний первого. Срок хранения связей 2 недели до {date}, после этого срока любое редактирование соответствующих описаний медиа-альбомов в 1080p канала нужно будет дублировать в чате канала для медиа-альбоиов в 720p.", DateTime.UtcNow.Add(TimeSpan.FromDays(14)).ToLocalTime());
                 }
                 catch (OperationCanceledException)
                 {
@@ -579,6 +636,8 @@ namespace TwitchStreamsRecorder
 
                     foreach (var s in openedStreams)
                         s.Dispose();
+
+                    _1080Msg = null;
                 }
             }
 
