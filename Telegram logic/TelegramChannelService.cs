@@ -103,9 +103,9 @@ namespace TwitchStreamsRecorder
                 await TryDeleteIfJoinOrLeaveAsync(svc);
 
             if (upd is UpdateEditChannelMessage edited)
-                await TryAdd720MediaCaption(edited);
+                await TryEdit720MediaCaption(edited);
         }
-        private async Task TryAdd720MediaCaption(UpdateEditChannelMessage edited)
+        private async Task TryEdit720MediaCaption(UpdateEditChannelMessage edited)
         {
             if (_map.TryGetValue(edited.message.ID, out int chatMsgId))
             {
@@ -620,7 +620,7 @@ namespace TwitchStreamsRecorder
                             options: cacheOptions);
                     }
 
-                    _log.Information("В памяти сохранены связи между элементами медиа-альбома в 1080p в канале и элементами медиа-альбома в 720p в чате канала для автоматического редиктирования описаний второго при редактированиии описаний первого. Срок хранения связей 2 недели до {date}, после этого срока любое редактирование соответствующих описаний медиа-альбомов в 1080p канала нужно будет дублировать в чате канала для медиа-альбоиов в 720p.", DateTime.UtcNow.Add(TimeSpan.FromDays(14)).ToLocalTime());
+                    _log.Information("В памяти сохранены связи между элементами медиа-альбома в 1080p в канале и элементами медиа-альбома в 720p в чате канала для автоматического редиктирования описаний второго при редактированиии описаний первого. Срок хранения связей 2 недели до {date}, после этого срока любое редактирование соответствующих описаний медиа-альбома в 1080p в канале не будут копироваться в описания медиа-альбома в 720p в чате канала.", DateTime.UtcNow.Add(TimeSpan.FromDays(14)).ToLocalTime());
                 }
                 catch (OperationCanceledException)
                 {

@@ -69,10 +69,10 @@ namespace TwitchStreamsRecorder.Network_logic
             switch (stage)
             {
                 case SessionStage.Vod1080Uploaded:
-                    sb.AppendLine($"720p скоро будет в комментах ||| ({info.Date:dd.MM.yyyy})");
+                    sb.AppendLine($"({info.Date:dd.MM.yyyy}) ||| 720p скоро будет в комментах");
                     break;
                 case SessionStage.Final:
-                    sb.AppendLine($"720p в комментах ||| ({info.Date:dd.MM.yyyy})");
+                    sb.AppendLine($"({info.Date:dd.MM.yyyy}) ||| 720p в комментах");
                     break;
                 default:
                     sb.AppendLine($"({info.Date:dd.MM.yyyy})");
@@ -122,13 +122,13 @@ namespace TwitchStreamsRecorder.Network_logic
                 if (stage is SessionStage.Vod1080Uploaded)
                 {
                     Add(MessageEntityType.Italic, "720p скоро будет в комментах");
-                    Add(MessageEntityType.Blockquote, $"720p скоро будет в комментах ||| ({info.Date:dd.MM.yyyy})");
+                    Add(MessageEntityType.Blockquote, $"({info.Date:dd.MM.yyyy}) ||| 720p скоро будет в комментах");
                 }
 
                 if (stage is SessionStage.Final)
                 {
                     Add(MessageEntityType.Italic, "720p в комментах");
-                    Add(MessageEntityType.Blockquote, $"720p в комментах ||| ({info.Date:dd.MM.yyyy})");
+                    Add(MessageEntityType.Blockquote, $"({info.Date:dd.MM.yyyy}) ||| 720p в комментах");
                 }
             }
 
