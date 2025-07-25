@@ -603,7 +603,37 @@ namespace TwitchStreamsRecorder
                                 throw new ThreadStateException();
                             }
 
-                            proc.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) Console.WriteLine(e.Data); };
+                            var progressRegex = new Regex(@"frame=\s*\d+", RegexOptions.Compiled);
+                            int lastProgressLen = 0;
+                            bool lastWasProgress = false;
+
+                            proc.ErrorDataReceived += (s, e) => 
+                            {
+                                if (string.IsNullOrEmpty(e.Data)) return;
+
+                                var m = progressRegex.Match(e.Data);
+
+                                if (m.Success)
+                                {
+                                    var text = $"[ffmpeg] {e.Data.TrimEnd()}";
+                                    var pad = new string(' ', Math.Max(0, lastProgressLen - text.Length));
+
+                                    Console.Write($"\r[ffmpeg]: {text}{pad}");
+                                    lastProgressLen = text.Length;
+                                    lastWasProgress = true;
+                                }
+                                else
+                                {
+                                    if (lastWasProgress)
+                                    {
+                                        Console.WriteLine();
+                                        lastWasProgress = false;
+                                        lastProgressLen = 0;
+                                    }
+
+                                    Console.WriteLine("[ffmpeg]: " + e.Data);
+                                }
+                            };
                             proc.BeginErrorReadLine();
 
                             _log.Information($"ffmpeg для сдвига метаданных для файла {tmp} успешно запущен.");
