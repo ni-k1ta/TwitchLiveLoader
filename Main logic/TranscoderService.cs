@@ -147,6 +147,29 @@ namespace TwitchStreamsRecorder
 
             bool isReadyToUpload = false;
 
+            object durationLock = new();
+            double fileDurationSec = 1;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+                    int dur = 1;
+
+                    while (await timer.WaitForNextTickAsync(cts) && Program.IsLive)
+                    {
+                        dur = await TelegramChannelService.GetDurationSeconds(currentBufferFile!, cts);
+                        lock (durationLock) fileDurationSec = dur;
+                    }
+
+                    dur = await TelegramChannelService.GetDurationSeconds(currentBufferFile!, cts);
+
+                    lock (durationLock) fileDurationSec = dur;
+                }
+                catch (OperationCanceledException) { }
+            }, cts);
+
             while (!cts.IsCancellationRequested)
             {
                 i++;
@@ -193,7 +216,7 @@ namespace TwitchStreamsRecorder
                 var writer = FfmpegProc.StandardInput;
                 var stdin = writer.BaseStream;
 
-                var progressRegex = new Regex(@"^frame=\s*\d+", RegexOptions.Compiled);
+                var progressRegex = new Regex(@"frame=\s*\d+.*time=(?<time>\d{2}:\d{2}:\d{2}\.\d+).*speed=\s*(?<speed>[\d\.]+)x", RegexOptions.Compiled);
 
                 int lastProgressLen = 0;
                 bool lastWasProgress = false;
@@ -202,9 +225,23 @@ namespace TwitchStreamsRecorder
                 {
                     if (string.IsNullOrEmpty(e.Data)) return;
 
-                    if (progressRegex.IsMatch(e.Data))
+                    var m = progressRegex.Match(e.Data);
+
+                    if (m.Success)
                     {
-                        var text = e.Data.TrimEnd();
+                        var t = TimeSpan.Parse(m.Groups["time"].Value);
+                        var speed = double.Parse(m.Groups["speed"].Value, CultureInfo.InvariantCulture);
+
+                        double durationSec;
+                        lock (durationLock) durationSec = fileDurationSec;
+
+                        var doneSec = t.TotalSeconds;
+                        var percent = Math.Min(100, doneSec / durationSec * 100);
+
+                        var etaSec = (durationSec - doneSec) / Math.Max(speed, 0.01);
+                        var eta = TimeSpan.FromSeconds(etaSec);
+
+                        var text = $"[ffmpeg] {percent,6:0.0}% | ETA {eta:hh\\:mm\\:ss} | {e.Data.Trim()}";
                         var pad = new string(' ', Math.Max(0, lastProgressLen - text.Length));
 
                         Console.Write($"\r[ffmpeg]: {text}{pad}");
@@ -437,7 +474,6 @@ namespace TwitchStreamsRecorder
 
                 int lastProgressLen = 0;
                 bool lastWasProgress = false;
-                double lastPercent = 0;
 
                 double fileDurationSec = await TelegramChannelService.GetDurationSeconds(buff, cts);
 
@@ -464,7 +500,6 @@ namespace TwitchStreamsRecorder
                         Console.Write($"\r[ffmpeg]: {text}{pad}");
                         lastProgressLen = text.Length;
                         lastWasProgress = true;
-                        lastPercent = percent;
                     }
                     else
                     {
