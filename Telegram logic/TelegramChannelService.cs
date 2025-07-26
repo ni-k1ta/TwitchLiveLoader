@@ -161,16 +161,18 @@ namespace TwitchStreamsRecorder
             {
                 try
                 {
-                    await using var streamPreview = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "newStreamPreview_720p.mp4"));
+                    var previewPath = Path.Combine(AppContext.BaseDirectory, "newStreamPreview_720p.mp4");
 
+                    await using var streamPreview = File.OpenRead(previewPath);
                     var inputStreamPreview = new InputFileStream(streamPreview, "preview.mp4");
-
+                    
+                    var duration = await GetDurationSeconds(previewPath, cts);
 
                     var msg = await _tgBot.SendVideo
                         (
                             chatId: _tgChannelId,
                             video: inputStreamPreview,
-                            duration: 12,
+                            duration: duration,
                             width: 1280,
                             height: 720,
                             caption: msgText,
@@ -615,8 +617,8 @@ namespace TwitchStreamsRecorder
                     foreach (var (msg1080, msg720) in _1080Msg!.Zip(massage720))
                     {
                         _map.Set(
-                            key: msg1080.MessageId,   // ID ролика 1080p в канале
-                            value: msg720.MessageId,  // ID соответствующего 720p в обсуждении
+                            key: msg1080.MessageId,
+                            value: msg720.MessageId,
                             options: cacheOptions);
                     }
 

@@ -244,7 +244,7 @@ internal class Program
 
         var resultCleaner = new Result1080CleanerService(
                  root: AppContext.BaseDirectory,
-                 retention: TimeSpan.FromDays(14),
+                 retention: TimeSpan.FromDays(10),
                  logger: _log,
                  stop: _cts.Token);
         _ = resultCleaner.RunAsync();
