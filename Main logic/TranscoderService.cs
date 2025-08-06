@@ -216,7 +216,7 @@ namespace TwitchStreamsRecorder
                 var writer = FfmpegProc.StandardInput;
                 var stdin = writer.BaseStream;
 
-                var progressRegex = new Regex(@"frame=\s*\d+.*time=(?<time>\d{2}:\d{2}:\d{2}\.\d+).*speed=\s*(?<speed>[\d\.]+)x", RegexOptions.Compiled);
+                var progressRegex = new Regex(@"frame=\s*\d+.*time=(?<time>\d{2}:\d{2}:\d{2}\.\d+).*speed=\s*(?<speed>(?:N/A|[\d\.]+))x", RegexOptions.Compiled);
 
                 int lastProgressLen = 0;
                 bool lastWasProgress = false;
@@ -230,7 +230,8 @@ namespace TwitchStreamsRecorder
                     if (m.Success)
                     {
                         var t = TimeSpan.Parse(m.Groups["time"].Value);
-                        var speed = double.Parse(m.Groups["speed"].Value, CultureInfo.InvariantCulture);
+                        var speedStr = m.Groups["speed"].Value;
+                        var speed = speedStr != "N/A" ? double.Parse(speedStr, CultureInfo.InvariantCulture) : 0.0;
 
                         double durationSec;
                         lock (durationLock) durationSec = fileDurationSec;
@@ -238,7 +239,7 @@ namespace TwitchStreamsRecorder
                         var doneSec = t.TotalSeconds;
                         var percent = Math.Min(100, doneSec / durationSec * 100);
 
-                        var etaSec = (durationSec - doneSec) / Math.Max(speed, 0.01);
+                        var etaSec = Math.Max(0, (durationSec - doneSec) / Math.Max(speed, 0.01));
                         var eta = TimeSpan.FromSeconds(etaSec);
 
                         var text = $"[ffmpeg] {percent,6:0.0}% | ETA {eta:hh\\:mm\\:ss} | {e.Data.Trim()}";
@@ -470,7 +471,8 @@ namespace TwitchStreamsRecorder
                     return;
                 }
 
-                var progressRegex = new Regex(@"frame=\s*\d+.*time=(?<time>\d{2}:\d{2}:\d{2}\.\d+).*speed=\s*(?<speed>[\d\.]+)x", RegexOptions.Compiled);
+                var progressRegex = new Regex(@"frame=\s*\d+.*time=(?<time>\d{2}:\d{2}:\d{2}\.\d+).*speed=\s*(?<speed>(?:N/A|[\d\.]+))x", RegexOptions.Compiled);
+
 
                 int lastProgressLen = 0;
                 bool lastWasProgress = false;
@@ -486,12 +488,14 @@ namespace TwitchStreamsRecorder
                     if (m.Success)
                     {
                         var t = TimeSpan.Parse(m.Groups["time"].Value);
-                        var speed = double.Parse(m.Groups["speed"].Value, CultureInfo.InvariantCulture);
+
+                        var speedStr = m.Groups["speed"].Value;
+                        var speed = speedStr != "N/A" ? double.Parse(speedStr, CultureInfo.InvariantCulture) : 0.0;
 
                         var doneSec = t.TotalSeconds;
                         var percent = Math.Min(100, doneSec / fileDurationSec * 100);
 
-                        var etaSec = (fileDurationSec - doneSec) / Math.Max(speed, 0.01);
+                        var etaSec = Math.Max(0, (fileDurationSec - doneSec) / Math.Max(speed, 0.01));
                         var eta = TimeSpan.FromSeconds(etaSec);
 
                         var text = $"[ffmpeg] {percent,6:0.0}% | ETA {eta:hh\\:mm\\:ss} | {e.Data.Trim()}";

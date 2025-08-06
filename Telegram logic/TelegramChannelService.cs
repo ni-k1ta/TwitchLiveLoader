@@ -113,15 +113,22 @@ namespace TwitchStreamsRecorder
 
                 var htmlCaption = _bot.Client.EntitiesToHtml(m.message, m.entities);
 
+                var normalized = string.IsNullOrWhiteSpace(htmlCaption) ? string.Empty : htmlCaption;
+
                 try
                 {
                     await _tgBot.EditMessageCaption
                     (
                         chatId: _tgChannelChatId,
                         messageId: chatMsgId,
-                        caption: htmlCaption,
+                        caption: normalized == string.Empty ? null : normalized,
                         parseMode: Telegram.Bot.Types.Enums.ParseMode.Html
                     );
+                }
+                catch (ApiRequestException apiEx) when (apiEx.ErrorCode == 400 && apiEx.Message.Contains("message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message"))
+                {
+                    _log.Information($"Подпись у видео в канале по ID: {edited.message.ID} не изменилась — игнорирую (message is not modified, скорее всего просто была проставлена реакция одним из админов).");
+                    return;
                 }
                 catch (Exception ex)
                 {
@@ -610,6 +617,10 @@ namespace TwitchStreamsRecorder
                     _log.Information($"Фрагменты перекодированной трансляции (720p) ({offset + media.Count} из {vodFiles.Length}) загружены успешно.");
 
                     var cacheOptions = new MemoryCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(14)
+                    };
+                    var captionCacheOptions = new MemoryCacheEntryOptions
                     {
                         AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(14)
                     };
