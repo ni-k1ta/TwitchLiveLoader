@@ -229,7 +229,7 @@ namespace TwitchStreamsRecorder
 
                     if (m.Success)
                     {
-                        var t = TimeSpan.Parse(m.Groups["time"].Value);
+                        var t = TimeSpan.ParseExact(m.Groups["time"].Value, @"hh\:mm\:ss\.FFFFFFF", CultureInfo.InvariantCulture);
                         var speedStr = m.Groups["speed"].Value;
                         var speed = speedStr != "N/A" ? double.Parse(speedStr, CultureInfo.InvariantCulture) : 0.0;
 
@@ -487,7 +487,7 @@ namespace TwitchStreamsRecorder
 
                     if (m.Success)
                     {
-                        var t = TimeSpan.Parse(m.Groups["time"].Value);
+                        var t = TimeSpan.ParseExact(m.Groups["time"].Value, @"hh\:mm\:ss\.FFFFFFF", CultureInfo.InvariantCulture);
 
                         var speedStr = m.Groups["speed"].Value;
                         var speed = speedStr != "N/A" ? double.Parse(speedStr, CultureInfo.InvariantCulture) : 0.0;
