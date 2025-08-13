@@ -33,7 +33,7 @@ namespace TwitchStreamsRecorder
 
             return bufferFile;
         }
-        private string[] BuildArgs(string output, string retryStreams, string retryMax, string retryOpen, string streamSegmentAttempts, string streamSegmentThreads, string streamTimeout, string hlsPlaylistReloadAttempts, string defaultStream, string OAuthToken, string twitchChannelLink)
+        private string[] BuildArgs(string output, string retryStreams, string retryMax, string retryOpen, string streamSegmentAttempts, string streamTimeout, string hlsPlaylistReloadAttempts, string defaultStream, string OAuthToken, string twitchChannelLink)
         {
             var args = new List<string>
             {
@@ -91,7 +91,7 @@ namespace TwitchStreamsRecorder
                     CreateNoWindow = true
                 };
 
-                var args = BuildArgs("--stdout", "3", "3", "10", "10", "2", "180", "10", "1080p,best,720p", OAuthToken, twitchChannelLink);
+                var args = BuildArgs("--stdout", "3", "3", "10", "10", "180", "10", "1080p,best,720p", OAuthToken, twitchChannelLink);
 
                 foreach (var arg in args) streamlinkPsi.ArgumentList.Add(arg);
 
@@ -159,19 +159,19 @@ namespace TwitchStreamsRecorder
         }
         public async Task ResetAsync(CancellationToken cts)
         {
-            if (StreamlinkProc != null)
-                await StreamlinkProc!.WaitForExitAsync(cts);
+            //if (StreamlinkProc != null)
+            //    await StreamlinkProc!.WaitForExitAsync(cts);
 
             await Task.WhenAll(_pendingBufferCopies!);
 
-            if (StreamlinkProc != null)
-            {
-                try { StreamlinkProc!.StandardOutput.Close(); }
-                catch { }
-            }
+            //if (StreamlinkProc != null)
+            //{
+            //    try { StreamlinkProc!.StandardOutput.Close(); }
+            //    catch { }
+            //}
 
             _bufferFileIndex = 0;
-            StreamlinkProc = null;
+            //StreamlinkProc = null;
         }
         private Task StartWritingFragmentsToBufferAsync(Stream stdout, string bufferFile, CancellationToken cts)
         {

@@ -130,6 +130,7 @@ namespace TwitchStreamsRecorder
             string? currentBufferFile = null;
             long currentBufferPos = 0;
 
+            _log.Verbose("Блокировка gateToken");
             await using var gateToken = await Globals.FfmpegGate.AcquireAsync(cts);   // ← блокирует, если идёт apt-upgrade
 
             string resultDir = DirectoriesManager.CreateTranscodeResultDirectory(pathForOutputResult);
@@ -169,6 +170,8 @@ namespace TwitchStreamsRecorder
                 }
                 catch (OperationCanceledException) { }
             }, cts);
+
+            string? bufferDirectory = Path.GetDirectoryName(currentBufferFile);
 
             while (!cts.IsCancellationRequested)
             {
@@ -341,7 +344,7 @@ namespace TwitchStreamsRecorder
 
                     if (height > 720)
                     {
-                        await StartTranscoding720(finalDir, tgChannel, result720Cleaner, cts);
+                        await StartTranscoding720(bufferDirectory!, finalDir, tgChannel, result720Cleaner, cts);
                     }
                     else
                     {
@@ -349,6 +352,7 @@ namespace TwitchStreamsRecorder
                     }
                 }
             }
+            _log.Verbose("Освобождение gateToken");
         }
         private async Task<(string? bufferFile, long readPos)> StartStreamFragmentsFromBufferAsync(Stream stdIn, StreamWriter writer, string? bufferFile, long readPos, CancellationToken cts)
         {
@@ -419,22 +423,24 @@ namespace TwitchStreamsRecorder
             stdIn.Close();
             return (null, 0);
         }
-        public async Task StartTranscoding720(string pathForOutputResult, TelegramChannelService tgChannel, Result720CleanerService result720Cleaner, CancellationToken cts)
+        public async Task StartTranscoding720(string currBuffDir, string pathForOutputResult, TelegramChannelService tgChannel, Result720CleanerService result720Cleaner, CancellationToken cts)
         {
             if (FfmpegProc720 is not null && !FfmpegProc720.HasExited)
                 return;
 
-            var parentDir = Path.GetDirectoryName(pathForOutputResult);
-            var currBuffDir = Directory.GetDirectories(parentDir!, "buffer_*").OrderByDescending(Path.GetFileName).FirstOrDefault();
+            //var parentDir = Path.GetDirectoryName(pathForOutputResult);
+            //var currBuffDir = Directory.GetDirectories(parentDir!, "buffer_*").OrderByDescending(Path.GetFileName).FirstOrDefault();
 
             string resultDir = Path.Combine(pathForOutputResult, "720p");
             Directory.CreateDirectory(resultDir);
 
-            var filesCount = Directory.EnumerateFiles(currBuffDir!, "*.ts", SearchOption.TopDirectoryOnly).Count();
+            var files = Directory.EnumerateFiles(currBuffDir, "*.ts", SearchOption.TopDirectoryOnly);
+
+            var filesCount = files.Count();
 
             int i = 0;
 
-            foreach (var buff in Directory.EnumerateFiles(currBuffDir!, "*.ts", SearchOption.TopDirectoryOnly))
+            foreach (var buff in files)
             {
                 i++;
 
@@ -680,16 +686,16 @@ namespace TwitchStreamsRecorder
         }
         public async Task ResetAsync(CancellationToken cts)
         {
-            if (FfmpegProc != null)
-            {
-                await FfmpegProc!.WaitForExitAsync(cts);
+            //if (FfmpegProc != null)
+            //{
+            //    await FfmpegProc!.WaitForExitAsync(cts);
 
-                try { FfmpegProc!.StandardInput.Close(); }
-                catch { }
-            }
+            //    try { FfmpegProc!.StandardInput.Close(); }
+            //    catch { }
+            //}
                 
             _outputFileIndex = 0;
-            FfmpegProc = null;
+            //FfmpegProc = null;
         }
         private string? FinalizeOutputFolder(string transcodeResultDirectory)
         {

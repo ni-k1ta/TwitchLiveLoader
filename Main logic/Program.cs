@@ -139,7 +139,9 @@ internal class Program
             await eventSubscribe.SubscribeStreamStatusAsync(token, json);
 
             if (!IsLive)
+            {
                 (recordingTask, transcodingTask) = await CheckLiveAndStartAsync(api, twitchLink, channelId, recorder, transcoder, config, bufferFilesQueue, bufferSize, tgChannel, pendingBufferCopies, result720Cleaner);
+            }
         };
         _ws.WebsocketReconnected += (_, __) =>
         {
@@ -217,12 +219,16 @@ internal class Program
 
             _log.Information("Стрим завершён.");
 
-            _ = recorder.ResetAsync(_cts.Token);
-            _ = transcoder.ResetAsync(_cts.Token);
+            //_ = recorder.ResetAsync(_cts.Token);
+            //_ = transcoder.ResetAsync(_cts.Token);
 
             bufferFilesQueue = [];
 
             pendingBufferCopies = new ConcurrentQueue<Task>();
+            bufferFilesQueue = new BlockingCollection<string>();
+
+            recorder = new RecorderService(_log);
+            transcoder = new TranscoderService(_log);
 
             await Task.Delay(TimeSpan.FromSeconds(10));
 
