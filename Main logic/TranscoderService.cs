@@ -93,7 +93,7 @@ namespace TwitchStreamsRecorder
                 [
                     "-c:a",                 "copy",
                     "-f",                   "segment",
-                    "-segment_time",        "30",
+                    "-segment_time",        "4500",
                     "-reset_timestamps",    "1",
                     "-segment_format",      "mp4",
                     "-strftime",            "1"
