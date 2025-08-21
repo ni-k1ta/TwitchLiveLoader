@@ -33,7 +33,7 @@ namespace TwitchStreamsRecorder
 
             return bufferFile;
         }
-        private string[] BuildArgs(string output, string retryStreams, string retryMax, string retryOpen, string streamSegmentAttempts, string streamTimeout, string hlsPlaylistReloadAttempts, string defaultStream, string OAuthToken, string twitchChannelLink)
+        private string[] BuildArgs(string output, string retryStreams, string retryMax, string retryOpen, string streamSegmentAttempts, string streamTimeout, string hlsPlaylistReloadAttempts, string hlsTimeout, string defaultStream, string OAuthToken, string twitchChannelLink)
         {
             var args = new List<string>
             {
@@ -46,6 +46,7 @@ namespace TwitchStreamsRecorder
                 "--stream-segment-threads",         Environment.ProcessorCount.ToString(),
                 "--stream-timeout",                 streamTimeout,
                 "--hls-playlist-reload-attempts",   hlsPlaylistReloadAttempts,
+                "--hls-timeout",                    hlsTimeout,
                 "--default-stream",                 defaultStream,
                 "--twitch-api-header",              $"Authorization=Bearer {OAuthToken}",
                 twitchChannelLink
@@ -91,7 +92,7 @@ namespace TwitchStreamsRecorder
                     CreateNoWindow = true
                 };
 
-                var args = BuildArgs("--stdout", "3", "3", "10", "10", "180", "10", "1080p,best,720p", OAuthToken, twitchChannelLink);
+                var args = BuildArgs("--stdout", "3", "3", "10", "10", "180", "10", "300", "1080p,best,720p", OAuthToken, twitchChannelLink);
 
                 foreach (var arg in args) streamlinkPsi.ArgumentList.Add(arg);
 
