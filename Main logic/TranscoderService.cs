@@ -65,8 +65,8 @@ namespace TwitchStreamsRecorder
                         [
                             "-i",       input,
                             "-c:v",     "libx264",
-                            "-preset",  "ultrafast",//"faster",
-                            "-crf",     "18"//"22"
+                            "-preset",  "faster",
+                            "-crf",     "22"
                         ]
                         );
                 }
