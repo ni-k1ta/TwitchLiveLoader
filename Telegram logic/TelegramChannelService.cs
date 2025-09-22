@@ -173,7 +173,7 @@ namespace TwitchStreamsRecorder
                     await using var streamPreview = File.OpenRead(previewPath);
                     var inputStreamPreview = new InputFileStream(streamPreview, "preview.mp4");
                     
-                    var duration = await GetDurationSeconds(previewPath, cts);
+                    var duration = await GetDurationSeconds(previewPath);
 
                     var msg = await _tgBot.SendVideo
                         (
@@ -362,7 +362,7 @@ namespace TwitchStreamsRecorder
 
                         var thumb = await _thumbnailGenerator.GenerateAsync(file, new ThumbnailOptions(Seek: TimeSpan.FromSeconds(2)), cts);
 
-                        var duration = await GetDurationSeconds(file, cts);
+                        var duration = await GetDurationSeconds(file);
 
                         var fs = File.OpenRead(file);
 
@@ -542,7 +542,7 @@ namespace TwitchStreamsRecorder
                     {
                         var thumb = await _thumbnailGenerator.GenerateAsync(file, new ThumbnailOptions(Seek: TimeSpan.FromSeconds(2)), cts);
 
-                        var duration = await GetDurationSeconds(file, cts);
+                        var duration = await GetDurationSeconds(file);
 
                         var fs = File.OpenRead(file);
                         FileStream? thumbStream = thumb != null ? File.OpenRead(thumb) : null;
@@ -704,7 +704,7 @@ namespace TwitchStreamsRecorder
             _streamInfo.Titles.Clear();
             _streamInfo.Categories.Clear();
         }
-        public static async Task<int> GetDurationSeconds(string videoFile, CancellationToken cts)
+        public static async Task<int> GetDurationSeconds(string videoFile)
         {
             if (!File.Exists(videoFile))
                 return 1;

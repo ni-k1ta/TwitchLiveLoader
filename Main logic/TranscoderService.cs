@@ -20,6 +20,11 @@ namespace TwitchStreamsRecorder
         private readonly ILogger _log = logger.ForContext("Source", "Transcoder");
         private enum TranscodeMode { Original, p720, FastStart }
 
+        private const long MaxSizeBytes = 1950L * 1024 * 1024;
+
+        // List of allowed video file extensions.
+        private static readonly string[] VideoExtensions = { ".mp4" };
+
         public void SetBufferQueue(BlockingCollection<string> bufferFilesQueue, int bufferSize)
         {
             _bufferFilesQueue = bufferFilesQueue;
@@ -160,11 +165,11 @@ namespace TwitchStreamsRecorder
 
                     while (await timer.WaitForNextTickAsync(cts) && Program.IsLive)
                     {
-                        dur = await TelegramChannelService.GetDurationSeconds(currentBufferFile!, cts);
+                        dur = await TelegramChannelService.GetDurationSeconds(currentBufferFile!);
                         lock (durationLock) fileDurationSec = dur;
                     }
 
-                    dur = await TelegramChannelService.GetDurationSeconds(currentBufferFile!, cts);
+                    dur = await TelegramChannelService.GetDurationSeconds(currentBufferFile!);
 
                     lock (durationLock) fileDurationSec = dur;
                 }
@@ -322,6 +327,7 @@ namespace TwitchStreamsRecorder
             {
                 try
                 {
+                    //await ProcessVideoFilesAsync(resultDir);
                     await FastStartPassAsync(resultDir, cts);
                 }
                 catch (Exception ex) when (ex is ThreadStateException or AggregateException)
@@ -353,6 +359,124 @@ namespace TwitchStreamsRecorder
                 }
             }
             _log.Verbose("Освобождение gateToken");
+        }
+        public async Task ProcessVideoFilesAsync(string directory)
+        {
+            // Get video files (non-recursive initially)
+            var videoFiles = Directory.GetFiles(directory)
+                .Where(f => VideoExtensions.Contains(Path.GetExtension(f).ToLower()))
+                .OrderBy(f => f)
+                .ToList();
+
+            int counter = 1;
+            foreach (var file in videoFiles)
+            {
+                string ext = Path.GetExtension(file);
+                string newNameBase = $"part{counter}";
+                string newFileName = $"{newNameBase}.temp";
+                string newFilePath = Path.Combine(directory, newFileName + ext);
+
+                try
+                {
+                    File.Move(file, newFilePath);
+                    _log.Information($"Фрагмент {Path.GetFileName(file)} переименован {Path.GetFileName(newFilePath)}");
+                }
+                catch (Exception ex)
+                {
+                    _log.Error(ex.Message, "Ошибка при попытке переименовывания фрагмента: ");
+                    continue;
+                }
+
+                // Process the file recursively.
+                await ProcessFileAsync(newFilePath, newNameBase);
+                counter++;
+            }
+        }
+        private async Task ProcessFileAsync(string filePath, string currentPartName)
+        {
+            FileInfo fi = new(filePath);
+            if (fi.Length <= MaxSizeBytes)
+            {
+                _log.Information($"{Path.GetFileName(filePath)} соответствует максимально возможному размеру файла.");
+                return;
+            }
+
+            _log.Information($"{Path.GetFileName(filePath)} больше максимально возможного размера {MaxSizeBytes / (1024 * 1024)} MB. Запущено разделеение файла...");
+
+            int durationInSec = await TelegramChannelService.GetDurationSeconds(filePath);
+
+            double halfDuration = durationInSec / 2.0;
+
+            string directory = fi.DirectoryName!;
+            string ext = fi.Extension;
+            string outputName1 = currentPartName + "_1";
+            string outputName2 = currentPartName + "_2";
+            string outputFileName1 = $"{outputName1}.temp";
+            string outputFileName2 = $"{outputName2}.temp";
+            string outputPath1 = Path.Combine(directory, outputFileName1 + ext);
+            string outputPath2 = Path.Combine(directory, outputFileName2 + ext);
+
+            bool splitSuccess = SplitVideoFile(filePath, halfDuration, outputPath1, outputPath2);
+            if (!splitSuccess)
+            {
+                _log.Error("Splitting failed for " + filePath);
+                return;
+            }
+
+            try
+            {
+                File.Delete(filePath);
+                _log.Information("Deleted original file: " + Path.GetFileName(filePath));
+            }
+            catch (Exception ex)
+            {
+                _log.Error("Error deleting file: " + ex.Message);
+            }
+
+            await ProcessFileAsync(outputPath1, outputName1);
+            await ProcessFileAsync(outputPath2, outputName2);
+        }
+        private bool SplitVideoFile(string inputPath, double splitTime, string outputPath1, string outputPath2)
+        {
+            bool firstPartSuccess = RunFFmpegCommand($"-i \"{inputPath}\" -t {splitTime} -c copy \"{outputPath1}\"");
+            bool secondPartSuccess = RunFFmpegCommand($"-i \"{inputPath}\" -ss {splitTime} -c copy \"{outputPath2}\"");
+            return firstPartSuccess && secondPartSuccess;
+        }
+
+        private bool RunFFmpegCommand(string arguments)
+        {
+            try
+            {
+                ProcessStartInfo startInfo = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using Process? process = Process.Start(startInfo);
+                if (process == null)
+                {
+                    _log.Error("Error executing ffmpeg command: Process could not be started.");
+                    return false;
+                }
+                string stdout = process.StandardOutput.ReadToEnd();
+                string stderr = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                // Write out ffmpeg output for debugging
+                Console.WriteLine("ffmpeg output: " + stdout);
+                if (!string.IsNullOrEmpty(stderr))
+                    Console.WriteLine("ffmpeg errors: " + stderr);
+                return process.ExitCode == 0;
+            }
+            catch (Exception ex)
+            {
+                _log.Error("Error executing ffmpeg command: " + ex.Message);
+                return false;
+            }
         }
         private async Task<(string? bufferFile, long readPos)> StartStreamFragmentsFromBufferAsync(Stream stdIn, StreamWriter writer, string? bufferFile, long readPos, CancellationToken cts)
         {
@@ -483,7 +607,7 @@ namespace TwitchStreamsRecorder
                 int lastProgressLen = 0;
                 bool lastWasProgress = false;
 
-                double fileDurationSec = await TelegramChannelService.GetDurationSeconds(buff, cts);
+                double fileDurationSec = await TelegramChannelService.GetDurationSeconds(buff);
 
                 FfmpegProc720!.ErrorDataReceived += (s, e) =>
                 {

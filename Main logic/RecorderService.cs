@@ -1,5 +1,6 @@
 ﻿using Serilog;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using TwitchStreamsRecorder.Helpers;
 
@@ -40,17 +41,29 @@ namespace TwitchStreamsRecorder
                 output,
                 "--twitch-disable-ads",
                 "--retry-streams",                  retryStreams,
+                "--hls-live-restart",
                 "--retry-max",                      retryMax,
                 "--retry-open",                     retryOpen,
                 "--stream-segment-attempts",        streamSegmentAttempts,
                 "--stream-segment-threads",         Environment.ProcessorCount.ToString(),
                 "--stream-timeout",                 streamTimeout,
-                "--hls-playlist-reload-attempts",   hlsPlaylistReloadAttempts,
-                "--hls-timeout",                    hlsTimeout,
-                "--default-stream",                 defaultStream,
-                "--twitch-api-header",              $"Authorization=Bearer {OAuthToken}",
-                twitchChannelLink
+                "--hls-playlist-reload-attempts",   hlsPlaylistReloadAttempts
             };
+
+            if (!OperatingSystem.IsWindows())
+            {
+                args.AddRange
+                    ([
+                        "--hls-timeout",            hlsTimeout
+                    ]);
+            }
+
+            args.AddRange
+                ([
+                    "--default-stream",             defaultStream,
+                    "--twitch-api-header",          $"Authorization=Bearer {OAuthToken}",
+                    twitchChannelLink
+                ]);
 
             return args.ToArray();
         }

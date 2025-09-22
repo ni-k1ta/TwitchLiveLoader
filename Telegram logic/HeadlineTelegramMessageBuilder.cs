@@ -59,11 +59,11 @@ namespace TwitchStreamsRecorder.Network_logic
             {
                 sb.AppendLine("👉 Начало - will be updated ✍");
                 sb.AppendLine();
-                sb.AppendLine("😱 Хайлайты");
-                sb.AppendLine("will be updated (мейби) ✍");
-                sb.AppendLine();
-                sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
-                sb.AppendLine();
+                //sb.AppendLine("😱 Хайлайты");
+                //sb.AppendLine("will be updated (мейби) ✍");
+                //sb.AppendLine();
+                //sb.AppendLine("👆[таймкоды мейби будут в описаниях к записям]👇");
+                //sb.AppendLine();
             }
 
             switch (stage)
@@ -111,10 +111,10 @@ namespace TwitchStreamsRecorder.Network_logic
                 Add(MessageEntityType.Bold, "New stream");
                 Add(MessageEntityType.Italic, "New stream");
 
-                Add(MessageEntityType.Bold, "Хайлайты");
-                Add(MessageEntityType.Blockquote, "will be updated (мейби) ✍");
+                //Add(MessageEntityType.Bold, "Хайлайты");
+                //Add(MessageEntityType.Blockquote, "will be updated (мейби) ✍");
 
-                Add(MessageEntityType.Code, "[таймкоды мейби будут в описаниях к записям]");
+                //Add(MessageEntityType.Code, "[таймкоды мейби будут в описаниях к записям]");
 
                 if (stage is SessionStage.LiveEnded)
                     Add(MessageEntityType.Blockquote, $"({info.Date:dd.MM.yyyy})");
